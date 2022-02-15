@@ -14,9 +14,13 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
 	Float* dag_values = (Float*) malloc(n_entries*sizeof(Float));
 	std::copy(data, data+n_entries, dag_values);
 
-	std::vector<uint> candidates;
+	std::unordered_set<uint> candidates;
+	candidates.reserve(n_rows);
 	for(uint i = 0; i < n_rows; i++)
-		candidates.push_back(i);
+		candidates.insert(i);
+
+	// Used to easily query rows already added to a previous level
+	std::unordered_set<uint> solved_rows;
 
 	uint level = 0;
 	uint level_idx = 0;
@@ -24,8 +28,13 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
 		uint level_size = 0;
 		for(uint candidate : candidates) {
 			bool independent = true;
-			for(uint j=rows[candidate]; j<rows[candidate + 1]; j++) {
-				if (cols[j] != candidate && dag_values[j] != 0.0f) {
+			uint off_diag_start = rows[candidate], off_diag_end = rows[candidate+1];
+			if (m_lower)
+				off_diag_end--;
+			else
+				off_diag_start++;
+			for(uint j=off_diag_start; j<off_diag_end; j++) {
+				if (solved_rows.find(cols[j]) == solved_rows.end()) {
 					independent = false;
 					break;
 				}
@@ -33,6 +42,7 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
 
 			if (independent) {
 				levels.push_back(candidate);
+				solved_rows.insert(candidate);
 				level_size++;
 			}
 		}
@@ -41,23 +51,15 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
 		std::sort(levels.end() - level_size, levels.end());
 
 		candidates.clear();
-		for (int i=level; i<level+level_size; i++) {
-			int row = levels[i];
-			for (int j=0; j<n_rows; j++) {
-				for (int k=rows[j]; k<rows[j+1]; k++) {
-					if (cols[k] == row && cols[k] != j) {
+		for (uint candidate=0; candidate<n_rows; candidate++) {
+			if (solved_rows.find(candidate) != solved_rows.end())
+				continue;
+			for (uint i=level; i<level+level_size; i++) {
+				uint row = levels[i];
+				for (uint k=rows[candidate]; k<rows[candidate+1]; k++) {
+					if (cols[k] == row && cols[k] != candidate) {
 						dag_values[k] = 0.0f;
-
-						bool candidate = true;
-						// TODO: replace this with a set
-						for (uint c : candidates) {
-							if (c == j) {
-								candidate = false;
-								break;
-							}
-						}
-						if (candidate)
-							candidates.push_back(j);
+						candidates.insert(candidate);
 					}
 				}
 			}
