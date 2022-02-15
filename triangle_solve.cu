@@ -1,28 +1,31 @@
-#include <iostream>
-#include <math.h>
-#include <vector>
+#include "triangle_solve.h"
 
-#define BLOCK_SIZE 2
+template<typename Float>
+SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entries, uint* rows, uint* cols, Float* data, bool lower) : m_lower(lower), m_n_rows(n_rows) {
+	std::vector<uint> levels;//TODO: this could be an array, as it always has as many elements as rows
+	levels.reserve(n_rows);
 
-void analyse(int n_rows, int n_elements, int* rows, int* columns, float* values, std::vector<size_t> &level_ptr, std::vector<size_t> &levels, std::vector<size_t> &chain_ptr) {
-	level_ptr.push_back(0);
-	chain_ptr.push_back(0);
+	m_level_ptr_h.reserve(n_rows + 1); // Worst-case size (100% dense triangular matrix)
+	m_level_ptr_h.push_back(0);
 
-	float* dag_values = (float*) malloc(n_elements*sizeof(float));
-	std::copy(values, values+n_elements, dag_values);
+	m_chain_ptr.reserve(n_rows + 1); // TODO: could use a more educated guess depending on block size and n_rows
+	m_chain_ptr.push_back(0);
 
-	std::vector<size_t> candidates;
-	for(size_t i = 0; i < n_rows; i++)
+	Float* dag_values = (Float*) malloc(n_entries*sizeof(Float));
+	std::copy(data, data+n_entries, dag_values);
+
+	std::vector<uint> candidates;
+	for(uint i = 0; i < n_rows; i++)
 		candidates.push_back(i);
 
-	size_t level = 0;
-	size_t level_idx = 0;
+	uint level = 0;
+	uint level_idx = 0;
 	while(levels.size() < n_rows) {
-		int level_size = 0;
-		for(size_t candidate : candidates) {
+		uint level_size = 0;
+		for(uint candidate : candidates) {
 			bool independent = true;
-			for(size_t j=rows[candidate]; j<rows[candidate + 1]; j++) {
-				if (columns[j] != candidate && dag_values[j] != 0.0f) {
+			for(uint j=rows[candidate]; j<rows[candidate + 1]; j++) {
+				if (cols[j] != candidate && dag_values[j] != 0.0f) {
 					independent = false;
 					break;
 				}
@@ -42,11 +45,12 @@ void analyse(int n_rows, int n_elements, int* rows, int* columns, float* values,
 			int row = levels[i];
 			for (int j=0; j<n_rows; j++) {
 				for (int k=rows[j]; k<rows[j+1]; k++) {
-					if (columns[k] == row && columns[k] != j) {
+					if (cols[k] == row && cols[k] != j) {
 						dag_values[k] = 0.0f;
 
 						bool candidate = true;
-						for (size_t c : candidates) {
+						// TODO: replace this with a set
+						for (uint c : candidates) {
 							if (c == j) {
 								candidate = false;
 								break;
@@ -62,28 +66,85 @@ void analyse(int n_rows, int n_elements, int* rows, int* columns, float* values,
 		level += level_size;
 		level_idx++;
 		if (level_size > BLOCK_SIZE) {
-			if (chain_ptr.back() == level_idx-1)
-				chain_ptr.push_back(level_idx);
+			if (m_chain_ptr.back() == level_idx-1)
+				m_chain_ptr.push_back(level_idx);
 			else {
-				chain_ptr.push_back(level_idx-1);
-				chain_ptr.push_back(level_idx);
+				m_chain_ptr.push_back(level_idx-1);
+				m_chain_ptr.push_back(level_idx);
 			}
 		}
-		level_ptr.push_back(level);
+		m_level_ptr_h.push_back(level);
 	}
-	if (chain_ptr.back() != level_idx)
-		chain_ptr.push_back(level_idx);
+	if (m_chain_ptr.back() != level_idx)
+		m_chain_ptr.push_back(level_idx);
+
+	m_chain_ptr.shrink_to_fit();
+	m_level_ptr_h.shrink_to_fit();
+
+	free(dag_values);
+
+	// Copy stuff to the GPU
+	// CSR Matrix arrays
+    cudaMalloc((void **)&m_rows_d, (1+n_rows)*sizeof(uint));
+    cudaMemcpy(m_rows_d, rows, (1+n_rows)*sizeof(uint), cudaMemcpyHostToDevice);
+    cudaMalloc((void **)&m_cols_d, n_entries*sizeof(uint));
+    cudaMemcpy(m_cols_d, cols, n_entries*sizeof(uint), cudaMemcpyHostToDevice);
+    cudaMalloc((void **)&m_data_d, n_entries*sizeof(Float));
+    cudaMemcpy(m_data_d, data, n_entries*sizeof(Float), cudaMemcpyHostToDevice);
+	// Solve data structure
+    cudaMalloc((void **)&m_level_ptr_d, m_level_ptr_h.size()*sizeof(uint));
+    cudaMemcpy(m_level_ptr_d, &m_level_ptr_h[0], m_level_ptr_h.size()*sizeof(uint), cudaMemcpyHostToDevice);
+    cudaMalloc((void **)&m_levels_d, n_rows*sizeof(uint));
+    cudaMemcpy(m_levels_d, &levels[0], n_rows*sizeof(uint), cudaMemcpyHostToDevice);
+	// RHS and solution
+	cudaMalloc((void**)&m_b_d, n_rows*sizeof(Float));
+	cudaMalloc((void**)&m_x_d, n_rows*sizeof(Float));
 }
 
-__global__
-void solve_row_multiblock(size_t level, size_t* level_ptr, size_t *levels, int* rows, int* columns, float* values, float* b, float* x, bool lower=true) {
-    size_t row_idx = level_ptr[level] + blockDim.x * blockIdx.x + threadIdx.x;
+template<typename Float>
+SparseTriangularSolver<Float>::~SparseTriangularSolver() {
+	cudaFree(m_rows_d);
+	cudaFree(m_cols_d);
+	cudaFree(m_data_d);
+	cudaFree(m_level_ptr_d);
+	cudaFree(m_levels_d);
+	cudaFree(m_b_d);
+	cudaFree(m_x_d);
+}
+
+template<typename Float>
+Float* SparseTriangularSolver<Float>::solve(Float *b) {
+
+	cudaMemcpy(m_b_d, b, m_n_rows*sizeof(Float), cudaMemcpyHostToDevice);
+	cudaMemcpy(m_x_d, b, m_n_rows*sizeof(Float), cudaMemcpyHostToDevice);//TODO: device to device copy instead?
+
+	for (int i=0; i<m_chain_ptr.size()-1; i++) {
+        if (m_chain_ptr[i]+1 == m_chain_ptr[i+1]){
+			// Multi block kernel
+			//TODO: this requires storing level_ptr on the CPU, is this really necessary?
+			int num_blocks = (m_level_ptr_h[m_chain_ptr[i+1]] - m_level_ptr_h[m_chain_ptr[i]] + BLOCK_SIZE - 1) / BLOCK_SIZE;
+			solve_row_multiblock<<<num_blocks, BLOCK_SIZE>>>(m_chain_ptr[i], m_level_ptr_d, m_levels_d, m_rows_d, m_cols_d, m_data_d, m_b_d, m_x_d, m_lower);
+		} else {
+			// Chain fits in one block
+			solve_chain<<<1, BLOCK_SIZE>>>(m_chain_ptr[i], m_chain_ptr[i+1], m_level_ptr_d, m_levels_d, m_rows_d, m_cols_d, m_data_d, m_b_d, m_x_d, m_lower);
+		}
+        cudaDeviceSynchronize();
+	}
+
+	Float *x_h = (Float*) malloc(m_n_rows*sizeof(Float));
+	cudaMemcpy(x_h, m_x_d, m_n_rows*sizeof(Float), cudaMemcpyDeviceToHost);
+	return x_h;
+}
+
+template<typename Float>
+__global__ void solve_row_multiblock(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
+    uint row_idx = level_ptr[level] + blockDim.x * blockIdx.x + threadIdx.x;
 	if (row_idx >= level_ptr[level+1])
 		return;
-	size_t row = levels[row_idx];
-	size_t row_start = rows[row];
-	size_t row_end = rows[row + 1];
-	size_t diag_ptr;
+	uint row = levels[row_idx];
+	uint row_start = rows[row];
+	uint row_end = rows[row + 1];
+	uint diag_ptr;
 	if (lower) {
 		diag_ptr = row_end - 1;
 		row_end--;
@@ -92,8 +153,8 @@ void solve_row_multiblock(size_t level, size_t* level_ptr, size_t *levels, int* 
 		row_start++;
 	}
 
-	float r = 0.0f;
-	for (size_t i=row_start; i<row_end; i++) {
+	Float r = 0.0f;
+	for (uint i=row_start; i<row_end; i++) {
 		r += values[i]*x[columns[i]];
 	}
 
@@ -101,19 +162,19 @@ void solve_row_multiblock(size_t level, size_t* level_ptr, size_t *levels, int* 
 	x[row] /= values[diag_ptr];
 }
 
-__global__
-void solve_chain(size_t chain_start, size_t chain_end, size_t *level_ptr, size_t *levels, int* rows, int* columns, float* values, float* b, float* x, bool lower=true) {
+template<typename Float>
+__global__ void solve_chain(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
 
-	for (int level=chain_start; level<chain_end; level++) {
-		size_t level_start = level_ptr[level];
-		size_t level_end = level_ptr[level+1];
-		size_t row_idx = level_start + threadIdx.x;
+	for (uint level=chain_start; level<chain_end; level++) {
+		uint level_start = level_ptr[level];
+		uint level_end = level_ptr[level+1];
+		uint row_idx = level_start + threadIdx.x;
 		if (row_idx >= level_end)
 			continue;
-		size_t row = levels[row_idx];
-		size_t row_start = rows[row];
-		size_t row_end = rows[row + 1];
-		size_t diag_ptr;
+		uint row = levels[row_idx];
+		uint row_start = rows[row];
+		uint row_end = rows[row + 1];
+		uint diag_ptr;
 		if (lower) {
 			diag_ptr = row_end - 1;
 			row_end--;
@@ -122,8 +183,8 @@ void solve_chain(size_t chain_start, size_t chain_end, size_t *level_ptr, size_t
 			row_start++;
 		}
 
-		float r = 0.0f;
-		for (size_t i=row_start; i<row_end; i++) {
+		Float r = 0.0f;
+		for (uint i=row_start; i<row_end; i++) {
 			r += values[i]*x[columns[i]];
 		}
 
@@ -133,82 +194,28 @@ void solve_chain(size_t chain_start, size_t chain_end, size_t *level_ptr, size_t
 	}
 }
 
-void solve_full(std::vector<size_t> chain_ptr, std::vector<size_t> level_ptr_h, size_t* levels, size_t* level_ptr_d, int n_rows, int n_elements, int* rows, int *columns, float* values, float* b, float* x, bool lower=true){
-
-	for (int i=0; i<chain_ptr.size()-1; i++) {
-        if (chain_ptr[i]+1 == chain_ptr[i+1]){
-			// Multi block kernel
-			int num_blocks = (level_ptr_h[chain_ptr[i+1]] - level_ptr_h[chain_ptr[i]] + BLOCK_SIZE - 1) / BLOCK_SIZE;
-			solve_row_multiblock<<<num_blocks, BLOCK_SIZE>>>(chain_ptr[i], level_ptr_d, levels, rows, columns, values, b, x, lower);
-		} else {
-			// Chain fits in one block
-			solve_chain<<<1, BLOCK_SIZE>>>(chain_ptr[i], chain_ptr[i+1], level_ptr_d, levels, rows, columns, values, b, x, lower);
-		}
-        cudaDeviceSynchronize();
-	}
-}
-
 int main(void) {
 
-    int n_rows = 9;
-    int n_entries = 18;
+	typedef float Float;
 
-	int rows_h[] = {0, 1, 2, 3, 5, 7, 9, 11, 14, 18};
-	int columns_h[] = {0, 1, 2, 0, 3, 0, 4, 1, 5, 2, 6, 3, 4, 7, 2, 3, 4, 8};
-	float values_h[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f};
+    uint n_rows = 9;
+    uint n_entries = 18;
 
-	std::vector<size_t> level_ptr_h;
-	std::vector<size_t> levels_h;
-	std::vector<size_t> chain_ptr_h;
+	uint rows_h[] = {0, 1, 2, 3, 5, 7, 9, 11, 14, 18};
+	uint columns_h[] = {0, 1, 2, 0, 3, 0, 4, 1, 5, 2, 6, 3, 4, 7, 2, 3, 4, 8};
+	Float values_h[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f};
 
-	analyse(n_rows, n_entries, rows_h, columns_h, values_h, level_ptr_h, levels_h, chain_ptr_h);
-	for (int i=0; i<chain_ptr_h.size(); i++)
-		std::cout << chain_ptr_h[i] << " ";
-	std::cout << std::endl;
-	for (int i=0; i<level_ptr_h.size(); i++)
-		std::cout << level_ptr_h[i] << " ";
-	std::cout << std::endl;
 
-	float b_h[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
-	float* x_h = new float[9];
-	std::copy(b_h, b_h+n_rows, x_h);
+	SparseTriangularSolver<Float> solver(n_rows, n_entries, rows_h, columns_h, values_h, true);
 
-    int* rows_d;
-    int* columns_d;
-    size_t* levels_d;
-    size_t* level_ptr_d;
-    float* x_d;
-    float* b_d;
-    float* values_d;
-    cudaMalloc((void **)&rows_d, (1+n_rows)*sizeof(int));
-    cudaMemcpy(rows_d, rows_h, (1+n_rows)*sizeof(int), cudaMemcpyHostToDevice);
-    cudaMalloc((void **)&columns_d, n_entries*sizeof(int));
-    cudaMemcpy(columns_d, columns_h, n_entries*sizeof(int), cudaMemcpyHostToDevice);
-    cudaMalloc((void **)&values_d, n_entries*sizeof(float));
-    cudaMemcpy(values_d, values_h, n_entries*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMalloc((void **)&levels_d, n_rows*sizeof(size_t));
-    cudaMemcpy(levels_d, &levels_h[0], n_rows*sizeof(size_t), cudaMemcpyHostToDevice);
-    cudaMalloc((void **)&level_ptr_d, level_ptr_h.size()*sizeof(size_t));
-    cudaMemcpy(level_ptr_d, &level_ptr_h[0], level_ptr_h.size()*sizeof(size_t), cudaMemcpyHostToDevice);
-    cudaMalloc((void **)&x_d, n_entries*sizeof(float));
-    cudaMemcpy(x_d, x_h, n_entries*sizeof(float), cudaMemcpyHostToDevice);
-    cudaMalloc((void **)&b_d, n_entries*sizeof(float));
-    cudaMemcpy(b_d, b_h, n_entries*sizeof(float), cudaMemcpyHostToDevice);
+	Float b_h[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
 
-	solve_full(chain_ptr_h, level_ptr_h, levels_d, level_ptr_d, n_rows, n_entries, rows_d, columns_d, values_d, b_d, x_d, true);
-
-    cudaMemcpy(x_h, x_d, n_entries*sizeof(float), cudaMemcpyDeviceToHost);
+	Float *x_h = solver.solve(b_h);
 
 	for (int i=0; i<9; i++)
 		std::cout << x_h[i] << " ";
 	std::cout << std::endl;
 
-    cudaFree(rows_d);
-    cudaFree(columns_d);
-    cudaFree(values_d);
-    cudaFree(x_d);
-    cudaFree(b_d);
-    cudaFree(levels_d);
 	return 0;
 }
 
