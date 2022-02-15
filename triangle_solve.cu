@@ -34,6 +34,9 @@ void analyse(int n_rows, int n_elements, int* rows, int* columns, float* values,
 			}
 		}
 
+		// Sort indices in the current level
+		std::sort(levels.end() - level_size, levels.end());
+
 		candidates.clear();
 		for (int i=level; i<level+level_size; i++) {
 			int row = levels[i];
