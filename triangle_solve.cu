@@ -1,6 +1,64 @@
 #include "triangle_solve.h"
 
 template<typename Float>
+__global__ void solve_row_multiblock(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
+    uint row_idx = level_ptr[level] + blockDim.x * blockIdx.x + threadIdx.x;
+	if (row_idx >= level_ptr[level+1])
+		return;
+	uint row = levels[row_idx];
+	uint row_start = rows[row];
+	uint row_end = rows[row + 1];
+	uint diag_ptr;
+	if (lower) {
+		diag_ptr = row_end - 1;
+		row_end--;
+	} else {
+		diag_ptr = row_start;
+		row_start++;
+	}
+
+	Float r = 0.0f;
+	for (uint i=row_start; i<row_end; i++) {
+		r += values[i]*x[columns[i]];
+	}
+
+	x[row] -= r;
+	x[row] /= values[diag_ptr];
+}
+
+template<typename Float>
+__global__ void solve_chain(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
+
+	for (uint level=chain_start; level<chain_end; level++) {
+		uint level_start = level_ptr[level];
+		uint level_end = level_ptr[level+1];
+		uint row_idx = level_start + threadIdx.x;
+		if (row_idx >= level_end)
+			continue;
+		uint row = levels[row_idx];
+		uint row_start = rows[row];
+		uint row_end = rows[row + 1];
+		uint diag_ptr;
+		if (lower) {
+			diag_ptr = row_end - 1;
+			row_end--;
+		} else {
+			diag_ptr = row_start;
+			row_start++;
+		}
+
+		Float r = 0.0f;
+		for (uint i=row_start; i<row_end; i++) {
+			r += values[i]*x[columns[i]];
+		}
+
+		x[row] -= r;
+		x[row] /= values[diag_ptr];
+		__syncthreads(); // Synchronize before moving to next level
+	}
+}
+
+template<typename Float>
 SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entries, uint* rows, uint* cols, Float* data, bool lower) : m_lower(lower), m_n_rows(n_rows) {
 	std::vector<uint> levels;//TODO: this could be an array, as it always has as many elements as rows
 	levels.reserve(n_rows);
@@ -138,86 +196,6 @@ Float* SparseTriangularSolver<Float>::solve(Float *b) {
 	return x_h;
 }
 
-template<typename Float>
-__global__ void solve_row_multiblock(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
-    uint row_idx = level_ptr[level] + blockDim.x * blockIdx.x + threadIdx.x;
-	if (row_idx >= level_ptr[level+1])
-		return;
-	uint row = levels[row_idx];
-	uint row_start = rows[row];
-	uint row_end = rows[row + 1];
-	uint diag_ptr;
-	if (lower) {
-		diag_ptr = row_end - 1;
-		row_end--;
-	} else {
-		diag_ptr = row_start;
-		row_start++;
-	}
 
-	Float r = 0.0f;
-	for (uint i=row_start; i<row_end; i++) {
-		r += values[i]*x[columns[i]];
-	}
-
-	x[row] -= r;
-	x[row] /= values[diag_ptr];
-}
-
-template<typename Float>
-__global__ void solve_chain(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
-
-	for (uint level=chain_start; level<chain_end; level++) {
-		uint level_start = level_ptr[level];
-		uint level_end = level_ptr[level+1];
-		uint row_idx = level_start + threadIdx.x;
-		if (row_idx >= level_end)
-			continue;
-		uint row = levels[row_idx];
-		uint row_start = rows[row];
-		uint row_end = rows[row + 1];
-		uint diag_ptr;
-		if (lower) {
-			diag_ptr = row_end - 1;
-			row_end--;
-		} else {
-			diag_ptr = row_start;
-			row_start++;
-		}
-
-		Float r = 0.0f;
-		for (uint i=row_start; i<row_end; i++) {
-			r += values[i]*x[columns[i]];
-		}
-
-		x[row] -= r;
-		x[row] /= values[diag_ptr];
-		__syncthreads(); // Synchronize before moving to next level
-	}
-}
-
-int main(void) {
-
-	typedef float Float;
-
-    uint n_rows = 9;
-    uint n_entries = 18;
-
-	uint rows_h[] = {0, 1, 2, 3, 5, 7, 9, 11, 14, 18};
-	uint columns_h[] = {0, 1, 2, 0, 3, 0, 4, 1, 5, 2, 6, 3, 4, 7, 2, 3, 4, 8};
-	Float values_h[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f, 11.0f, 12.0f, 13.0f, 14.0f, 15.0f, 16.0f, 17.0f, 18.0f};
-
-
-	SparseTriangularSolver<Float> solver(n_rows, n_entries, rows_h, columns_h, values_h, true);
-
-	Float b_h[] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f};
-
-	Float *x_h = solver.solve(b_h);
-
-	for (int i=0; i<9; i++)
-		std::cout << x_h[i] << " ";
-	std::cout << std::endl;
-
-	return 0;
-}
-
+template class SparseTriangularSolver<float>;
+template class SparseTriangularSolver<double>;

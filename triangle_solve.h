@@ -36,5 +36,5 @@ private:
 	Float *m_x_d;
 };
 
-template<typename Float> __global__ void solve_row_multiblock(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower=true);
-template<typename Float> __global__ void solve_chain(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower=true);
+using SparseTriangularSolverF = SparseTriangularSolver<float>;
+using SparseTriangularSolverD = SparseTriangularSolver<double>;
