@@ -173,7 +173,7 @@ SparseTriangularSolver<Float>::~SparseTriangularSolver() {
 }
 
 template<typename Float>
-Float* SparseTriangularSolver<Float>::solve(Float *b) {
+std::vector<Float> SparseTriangularSolver<Float>::solve(Float *b) {
 
 	cudaMemcpy(m_b_d, b, m_n_rows*sizeof(Float), cudaMemcpyHostToDevice);
 	cudaMemcpy(m_x_d, b, m_n_rows*sizeof(Float), cudaMemcpyHostToDevice);//TODO: device to device copy instead?
@@ -193,7 +193,7 @@ Float* SparseTriangularSolver<Float>::solve(Float *b) {
 
 	Float *x_h = (Float*) malloc(m_n_rows*sizeof(Float));
 	cudaMemcpy(x_h, m_x_d, m_n_rows*sizeof(Float), cudaMemcpyDeviceToHost);
-	return x_h;
+	return std::vector<Float>(x_h, x_h+m_n_rows);
 }
 
 

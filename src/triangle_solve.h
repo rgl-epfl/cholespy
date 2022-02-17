@@ -11,7 +11,7 @@ public:
 	SparseTriangularSolver(uint n_rows, uint n_elements, uint *rows, uint *cols, Float *data, bool lower);
 	~SparseTriangularSolver();
 
-	Float* solve(Float *b);
+	std::vector<Float> solve(Float *b);
 
 private:
 	// Lower or upper triangular matrix
