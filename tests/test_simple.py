@@ -14,7 +14,6 @@ def test_solver_float():
     b = np.arange(1.0, 10.0, dtype=np.float32)
 
     solver = SparseTriangularSolverF(M.shape[0], len(data), Int(rows).data_(), Int(cols).data_(), Float32(data).data_(), True)
-    print(solver.solve(Float32(b).data_()))
     assert(np.allclose(solver.solve(Float32(b).data_()), spsolve_triangular(M, b, lower=True)))
 
 def test_solver_double():
@@ -26,7 +25,6 @@ def test_solver_double():
     b = np.arange(1.0, 10.0, dtype=np.float64)
 
     solver = SparseTriangularSolverD(M.shape[0], len(data), Int(rows).data_(), Int(cols).data_(), Float64(data).data_(), True)
-    print(solver.solve(Float64(b).data_()))
     assert(np.allclose(solver.solve(Float64(b).data_()), spsolve_triangular(M, b, lower=True)))
 
 if __name__ == "__main__":
