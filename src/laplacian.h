@@ -5,7 +5,18 @@
 #include <algorithm>
 #include <math.h>
 
-// Uniform laplacian in the CSC format
+/**
+ * Class Laplacian
+ *
+ * This class implements a CSC representation of the matrix I + lambda*L, where
+ * L is the combinatorial Laplacian (for now, only a triangle mesh is
+ * supported.) TODO: find a better suited name.
+ *
+ * The purpose of this class is to construct the data required by CHOLMOD to run
+ * the Cholesky factorization of the matrix. As a consequence, we only build the
+ * lower half of the matrix, since it is symmetric and CHOLMOD effectively only
+ * uses this part.
+ */
 template <typename Float>
 class Laplacian {
 public:
