@@ -48,9 +48,13 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
 
 			if (independent) {
 				levels.push_back(candidate);
-				solved_rows.insert(candidate);
 				level_size++;
 			}
+		}
+
+		// Add new levels to list of solved rows
+		for (auto i=levels.end()-level_size; i != levels.end(); i++) {
+			solved_rows.insert(*i);
 		}
 
 		// Sort indices in the current level
