@@ -18,24 +18,32 @@ endif()
 find_package(pybind11 CONFIG REQUIRED)
 # Find CUDA to link to the CUDA Driver API
 find_package(CUDAToolkit REQUIRED)
+# CHOLMOD package
+find_package(SuiteSparse CONFIG REQUIRED)
 
 add_library(
   cholesky_cuda STATIC
 
+  src/cholesky_solver.h      src/cholesky_solver.cpp
   src/triangle_solve.h src/triangle_solve.cpp
   src/laplacian.h      src/laplacian.cpp
   kernels/kernels.h
 )
 
 set_property(TARGET cholesky_cuda PROPERTY POSITION_INDEPENDENT_CODE ON)
-target_link_libraries(cholesky_cuda CUDA::cuda_driver)
+
+target_link_libraries(cholesky_cuda
+  CUDA::cuda_driver
+  SuiteSparse::cholmod
+)
+
 set_property(TARGET cholesky_cuda PROPERTY CXX_STANDARD "17")
 
 pybind11_add_module(_cholesky_core MODULE src/main.cpp)
+set_property(TARGET _cholesky_core PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_link_libraries(_cholesky_core PUBLIC cholesky_cuda)
 
 #target_include_directories(_cholesky_core PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${CUDA_INCLUDE_DIRS})
 target_compile_definitions(_cholesky_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 
 install(TARGETS _cholesky_core DESTINATION .)
-
