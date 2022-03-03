@@ -26,15 +26,15 @@ bool init = false;
 // TODO: I'm not sure it's a great idea to template this like this
 template <typename Float>
 void initCuda() {
-	cuda_check(cuInit(0));
-	cuda_check(cuDeviceGet(&cu_device, 0));
-	cuda_check(cuCtxCreate(&cu_context, 0, cu_device));
-	cuda_check(cuModuleLoadData(&cu_module, (void *) imageBytes));
-	if (std::is_same_v<Float, float>) {
-		cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_float"));
-		cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_float"));
-	} else {
-		cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_double"));
-		cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_double"));
-	}
+    cuda_check(cuInit(0));
+    cuda_check(cuDeviceGet(&cu_device, 0));
+    cuda_check(cuCtxCreate(&cu_context, 0, cu_device));
+    cuda_check(cuModuleLoadData(&cu_module, (void *) imageBytes));
+    if (std::is_same_v<Float, float>) {
+        cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_float"));
+        cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_float"));
+    } else {
+        cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_double"));
+        cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_double"));
+    }
 }

@@ -9,7 +9,7 @@
 template<typename Float>
 class CholeskySolver {
 public:
-	CholeskySolver(uint n_verts, uint n_faces, uint* faces, Float lambda);
+    CholeskySolver(uint n_verts, uint n_faces, uint* faces, Float lambda);
 
     ~CholeskySolver();
 
