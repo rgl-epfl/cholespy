@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stdio.h>
 #include <vector>
 #include <algorithm>
@@ -14,7 +16,6 @@ public:
 	std::vector<Float> data() {return m_data;}
 
 private:
-	Float 	           m_lambda;
 	std::vector<uint>  m_col_ptr;
 	std::vector<uint>  m_rows;
 	std::vector<Float> m_data;

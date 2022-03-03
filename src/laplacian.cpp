@@ -2,7 +2,7 @@
 #include <iostream>
 
 template <typename Float>
-Laplacian<Float>::Laplacian(uint n_verts, uint n_faces, uint *faces, Float lambda) : m_lambda(lambda) {
+Laplacian<Float>::Laplacian(uint n_verts, uint n_faces, uint *faces, Float lambda) {
 
 	// First, we build the COO representation of the laplacian
 	std::vector<uint> ii;
@@ -89,7 +89,7 @@ Laplacian<Float>::Laplacian(uint n_verts, uint n_faces, uint *faces, Float lambd
 		uint row = tmp_rows[i];
 		while (i<tmp_col_ptr[j+1]) {
 			m_rows.push_back(row);
-			m_data.push_back(1);
+			m_data.push_back(-lambda);
 			n_elements++;
 			uint previous_row = row;
 			while (row == previous_row && i<tmp_col_ptr[j+1]) {
@@ -112,7 +112,7 @@ Laplacian<Float>::Laplacian(uint n_verts, uint n_faces, uint *faces, Float lambd
 	for (uint j=0; j<n_verts; j++) {
 		for (uint i=m_col_ptr[j]; i<m_col_ptr[j+1]; i++) {
 			if (j == m_rows[i]) // diagonal element
-				m_data[i] = (1.0 - (Float) col_entries[j]) * lambda + 1.0;
+				m_data[i] = ((Float) col_entries[j] - 1) * lambda + 1.0f;
 		}
 	}
 }
