@@ -14,7 +14,13 @@ def test_solver_float():
     b = np.arange(1.0, 10.0, dtype=np.float32)
 
     solver = SparseTriangularSolverF(M.shape[0], len(data), Int(rows).data_(), Int(cols).data_(), Float32(data).data_(), True)
+
     assert(np.allclose(solver.solve(Float32(b).data_()), spsolve_triangular(M, b, lower=True)))
+
+    Mt = sp.csr_matrix(M.T)
+    solver = SparseTriangularSolverF(Mt.shape[0], len(data), Int(Mt.indptr).data_(), Int(Mt.indices).data_(), Float32(Mt.data).data_(), False)
+
+    assert(np.allclose(solver.solve(Float32(b).data_()), spsolve_triangular(Mt, b, lower=False)))
 
 def test_solver_double():
     data = np.arange(1.0, 19.0, dtype=np.float64)
@@ -25,8 +31,10 @@ def test_solver_double():
     b = np.arange(1.0, 10.0, dtype=np.float64)
 
     solver = SparseTriangularSolverD(M.shape[0], len(data), Int(rows).data_(), Int(cols).data_(), Float64(data).data_(), True)
+
     assert(np.allclose(solver.solve(Float64(b).data_()), spsolve_triangular(M, b, lower=True)))
 
-if __name__ == "__main__":
-    test_solver_float()
-    test_solver_double()
+    Mt = sp.csr_matrix(M.T)
+    solver = SparseTriangularSolverD(Mt.shape[0], len(data), Int(Mt.indptr).data_(), Int(Mt.indices).data_(), Float64(Mt.data).data_(), False)
+
+    assert(np.allclose(solver.solve(Float64(b).data_()), spsolve_triangular(Mt, b, lower=False)))
