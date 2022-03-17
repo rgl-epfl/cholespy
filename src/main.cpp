@@ -10,17 +10,6 @@
 namespace py = pybind11;
 
 template <typename Float>
-void declare_solver(py::module &m, std::string typestr) {
-    using Class = SparseTriangularSolver<Float>;
-    std::string class_name = std::string("SparseTriangularSolver") + typestr;
-    py::class_<Class>(m, class_name.c_str())
-        .def(py::init([](uint n_rows, uint n_elements, uintptr_t row_ptr, uintptr_t col_ptr, uintptr_t data_ptr, bool lower){
-            return new Class(n_rows, n_elements, (uint*) row_ptr, (uint*) col_ptr, (Float*) data_ptr, lower);
-        }))
-        .def("solve", [](Class &self, uintptr_t b_ptr){return self.solve((Float*) b_ptr);});
-}
-
-template <typename Float>
 void declare_laplacian(py::module &m, std::string typestr) {
     using Class = Laplacian<Float>;
     std::string class_name = std::string("Laplacian") + typestr;
@@ -45,9 +34,6 @@ void declare_cholesky(py::module &m, std::string typestr) {
 }
 
 PYBIND11_MODULE(_cholesky_core, m) {
-
-    declare_solver<float>(m, "F");
-    declare_solver<double>(m, "D");
 
     declare_laplacian<float>(m, "F");
     declare_laplacian<double>(m, "D");

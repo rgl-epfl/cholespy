@@ -1,26 +1,18 @@
+#pragma once
 #include <cuda.h>
 #include <stdio.h>
 #include <type_traits>
 #include "../kernels/kernels.h"
-
-/// Assert that a CUDA operation is correctly issued
-#define cuda_check(err) cuda_check_impl(err, __FILE__, __LINE__)
-
-void cuda_check_impl(CUresult errval, const char *file, const int line) {
-    if (errval != CUDA_SUCCESS && errval != CUDA_ERROR_DEINITIALIZED) {
-        const char *name = nullptr, *msg = nullptr;
-        cuGetErrorName(errval, &name);
-        cuGetErrorString(errval, &msg);
-        fprintf(stderr, "cuda_check(): API error = %04d (%s): \"%s\" in "
-                 "%s:%i.\n", (int) errval, name, msg, file, line);
-    }
-}
+#include "cuda_helpers.h"
 
 CUdevice cu_device;
 CUcontext cu_context;
 CUmodule cu_module;
 CUfunction solve_chain;
 CUfunction solve_row_multiblock;
+CUfunction find_roots;
+CUfunction analyze;
+CUfunction find_roots_in_candidates;
 bool init = false;
 
 // TODO: I'm not sure it's a great idea to template this like this
@@ -37,4 +29,7 @@ void initCuda() {
         cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_double"));
         cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_double"));
     }
+    cuda_check(cuModuleGetFunction(&find_roots, cu_module, (char *)"find_roots"));
+    cuda_check(cuModuleGetFunction(&analyze, cu_module, (char *)"analyze"));
+    cuda_check(cuModuleGetFunction(&find_roots_in_candidates, cu_module, (char *)"find_roots_in_candidates"));
 }

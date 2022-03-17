@@ -24,23 +24,27 @@ find_package(SuiteSparse CONFIG REQUIRED)
 add_library(
   cholesky_cuda STATIC
 
+  src/cuda_setup.h
+  src/cuda_helpers.h           src/cuda_helpers.cpp
   src/cholesky_solver.h      src/cholesky_solver.cpp
-  src/triangle_solve.h src/triangle_solve.cpp
-  src/laplacian.h      src/laplacian.cpp
+  src/triangle_solve.h       src/triangle_solve.cpp
+  src/laplacian.h            src/laplacian.cpp
   kernels/kernels.h
 )
 
 set_property(TARGET cholesky_cuda PROPERTY POSITION_INDEPENDENT_CODE ON)
+# set_property(TARGET cholesky_cuda PROPERTY CXX_STANDARD "17")
+target_compile_features(cholesky_cuda PRIVATE cxx_std_17)
 
 target_link_libraries(cholesky_cuda
   CUDA::cuda_driver
   SuiteSparse::cholmod
 )
 
-set_property(TARGET cholesky_cuda PROPERTY CXX_STANDARD "17")
 
 pybind11_add_module(_cholesky_core MODULE src/main.cpp)
 set_property(TARGET _cholesky_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+target_compile_features(_cholesky_core PRIVATE cxx_std_17)
 target_link_libraries(_cholesky_core PUBLIC cholesky_cuda)
 
 #target_include_directories(_cholesky_core PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${CUDA_INCLUDE_DIRS})

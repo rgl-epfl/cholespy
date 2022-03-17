@@ -44,7 +44,6 @@ def test_cube_double():
 
     assert(np.allclose(solver.solve(Float64(b).data_()), factor.solve_A(b)))
 
-@pytest.mark.slow
 def test_ico_float():
     import igl
     import os
@@ -69,7 +68,6 @@ def test_ico_float():
 
     assert(np.allclose(solver.solve(Float32(b).data_()), factor.solve_A(b)))
 
-@pytest.mark.slow
 def test_ico_double():
     import igl
     import os

@@ -3,13 +3,13 @@
 #include <algorithm>
 #include <vector>
 #include <unordered_set>
-#include <cuda.h>
+#include "cuda_helpers.h"
 
 #define BLOCK_SIZE 1024
 
 template<typename Float> class SparseTriangularSolver {
 public:
-    SparseTriangularSolver(uint n_rows, uint n_elements, uint *rows, uint *cols, Float *data, bool lower);
+    SparseTriangularSolver(uint n_rows, uint n_entries, CUdeviceptr csc_cols_d, CUdeviceptr csc_rows_d, CUdeviceptr csr_rows_d, CUdeviceptr csr_cols_d, CUdeviceptr csr_data_d, bool lower);
     ~SparseTriangularSolver();
 
     std::vector<Float> solve(Float *b);

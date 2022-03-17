@@ -1,123 +1,148 @@
 #include "triangle_solve.h"
-#include "cuda_setup.h"
+
+// TODO: This is a bit dirty, there's probably a better way
+extern CUfunction solve_chain;
+extern CUfunction solve_row_multiblock;
+extern CUfunction find_roots;
+extern CUfunction analyze;
+extern CUfunction find_roots_in_candidates;
+
+// Switch 2 pointers
+void swap_pointers(void *a, void *b) {
+    void *tmp = a;
+    a = b;
+    b = tmp;
+}
 
 template<typename Float>
-SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entries, uint* rows, uint* cols, Float* data, bool lower) : m_lower(lower), m_n_rows(n_rows) {
+SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entries, CUdeviceptr csc_cols_d, CUdeviceptr csc_rows_d, CUdeviceptr csr_rows_d, CUdeviceptr csr_cols_d, CUdeviceptr csr_data_d, bool lower)
+ : m_lower(lower), m_n_rows(n_rows), m_rows_d(csr_rows_d), m_cols_d(csr_cols_d), m_data_d(csr_data_d) {
 
-    // Initialize CUDA and load the kernels if not already done
-    if (!init)
-        initCuda<Float>();
+    // Candidate array
+    CUdeviceptr c_root;
+    cuda_check(cuMemAlloc(&c_root, n_rows*sizeof(bool)));
+    cuda_check(cuMemsetD8(c_root, 0, n_rows)); // Initialize to all false
+    // level write array (the current level)
+    CUdeviceptr w_root;
+    cuda_check(cuMemAlloc(&w_root, n_rows*sizeof(bool)));
+    cuda_check(cuMemsetD8(w_root, 0, n_rows)); // Initialize to all false
+    // level read array (the previous level)
+    CUdeviceptr r_root;
+    cuda_check(cuMemAlloc(&r_root, n_rows*sizeof(bool)));
+    cuda_check(cuMemsetD8(r_root, 0, n_rows)); // Initialize to all false
 
-    std::vector<uint> levels;//TODO: this could be an array, as it always has as many elements as rows
-    levels.reserve(n_rows);
+    // Counter of rows already in levels
+    CUdeviceptr level_count_d;
+    uint level_count_h = 0;
+    cuda_check(cuMemAlloc(&level_count_d, sizeof(uint)));
+    cuda_check(cuMemcpyHtoD(level_count_d, &level_count_h, sizeof(uint)));
 
-    m_level_ptr_h.reserve(n_rows + 1); // Worst-case size (100% dense triangular matrix)
+    // Row i belongs in level level_ind[i]
+    uint *level_ind_h = (uint *)malloc(n_rows*sizeof(uint));
+    CUdeviceptr level_ind_d;
+    cuda_check(cuMemAlloc(&level_ind_d, n_rows*sizeof(uint)));
+
+    m_level_ptr_h.reserve(n_rows);
     m_level_ptr_h.push_back(0);
-
     m_chain_ptr.reserve(n_rows + 1); // TODO: could use a more educated guess depending on block size and n_rows
     m_chain_ptr.push_back(0);
+    uint level_size = 0;
+    uint level_count_prev = 0;
 
-    Float* dag_values = (Float*) malloc(n_entries*sizeof(Float));
-    std::copy(data, data+n_entries, dag_values);
+    //find_roots
+    uint num_blocks = (n_rows + BLOCK_SIZE -1) / BLOCK_SIZE;
+    void *fr_args[6] = {&n_rows, &level_count_d, &level_ind_d, &m_rows_d, &m_cols_d, &r_root};
+    cuda_check(cuLaunchKernel(find_roots,
+                            num_blocks, 1, 1,
+                            BLOCK_SIZE, 1, 1,
+                            0, 0, fr_args, 0));
 
-    std::unordered_set<uint> candidates;
-    candidates.reserve(n_rows);
-    for(uint i = 0; i < n_rows; i++)
-        candidates.insert(i);
+    cuda_check(cuMemcpyDtoH(&level_count_h, level_count_d, sizeof(uint)));
+    m_level_ptr_h.push_back(level_count_h);
 
-    // Used to easily query rows already added to a previous level
-    std::unordered_set<uint> solved_rows;
-
-    uint level = 0;
-    uint level_idx = 0;
-    while(levels.size() < n_rows) {
-        uint level_size = 0;
-        for(uint candidate : candidates) {
-            bool independent = true;
-            uint off_diag_start = rows[candidate], off_diag_end = rows[candidate+1];
-            if (m_lower)
-                off_diag_end--;
-            else
-                off_diag_start++;
-            for(uint j=off_diag_start; j<off_diag_end; j++) {
-                if (solved_rows.find(cols[j]) == solved_rows.end()) {
-                    independent = false;
-                    break;
-                }
-            }
-
-            if (independent) {
-                levels.push_back(candidate);
-                level_size++;
-            }
-        }
-
-        // Add new levels to list of solved rows
-        for (auto i=levels.end()-level_size; i != levels.end(); i++) {
-            solved_rows.insert(*i);
-        }
-
-        // Sort indices in the current level
-        std::sort(levels.end() - level_size, levels.end());
-
-        candidates.clear();
-        for (uint candidate=0; candidate<n_rows; candidate++) {
-            if (solved_rows.find(candidate) != solved_rows.end())
-                continue;
-            for (uint i=level; i<level+level_size; i++) {
-                uint row = levels[i];
-                for (uint k=rows[candidate]; k<rows[candidate+1]; k++) {
-                    if (cols[k] == row && cols[k] != candidate) {
-                        dag_values[k] = 0.0f;
-                        candidates.insert(candidate);
-                    }
-                }
-            }
-        }
-
-        level += level_size;
-        level_idx++;
-        if (level_size > BLOCK_SIZE) {
-            if (m_chain_ptr.back() == level_idx-1)
-                m_chain_ptr.push_back(level_idx);
-            else {
-                m_chain_ptr.push_back(level_idx-1);
-                m_chain_ptr.push_back(level_idx);
-            }
-        }
-        m_level_ptr_h.push_back(level);
+    if (level_count_h > BLOCK_SIZE) {
+        // First level is too big to be part of a chain
+        m_chain_ptr.push_back(1);
     }
-    if (m_chain_ptr.back() != level_idx)
-        m_chain_ptr.push_back(level_idx);
+
+    uint level = 1;
+
+    // Arguments for the kernels
+    void *analyze_args[7] = {&n_rows, &level, &r_root, &c_root, &level_ind_d, &csc_cols_d, &csc_rows_d};
+    void *frc_args[8] = {&n_rows, &level, &level_count_d, &w_root, &c_root, &level_ind_d, &m_rows_d, &m_cols_d};
+
+    while (level_count_h < n_rows) {
+        // analyze
+        cuda_check(cuLaunchKernel(analyze,
+                                num_blocks, 1, 1,
+                                BLOCK_SIZE, 1, 1,
+                                0, 0, analyze_args, 0));
+        // find_roots_in_candidates
+        cuda_check(cuLaunchKernel(find_roots_in_candidates,
+                                num_blocks, 1, 1,
+                                BLOCK_SIZE, 1, 1,
+                                0, 0, frc_args, 0));
+
+        //update level count
+        level_count_prev = level_count_h;
+        cuda_check(cuMemcpyDtoH(&level_count_h, level_count_d, sizeof(uint)));
+        level_size = level_count_h - level_count_prev;
+        m_level_ptr_h.push_back(level_count_h);
+
+        // Chains
+        if (level_size > BLOCK_SIZE) {
+            if (m_chain_ptr.back() == level)
+                m_chain_ptr.push_back(level+1); // previous level was also too large
+            else {
+                m_chain_ptr.push_back(level);
+                m_chain_ptr.push_back(level+1);
+            }
+        }
+        level++;
+        // Swap read and write buffers
+        swap_pointers((void *)r_root, (void *)w_root);
+    }
+    // Add final element if not already there (i.e. if the last level is part of
+    // a chain)
+    if (m_chain_ptr.back() != level)
+        m_chain_ptr.push_back(level);
 
     m_chain_ptr.shrink_to_fit();
     m_level_ptr_h.shrink_to_fit();
 
-    free(dag_values);
+    // Build the actual solve data structure
+    cuda_check(cuMemcpyDtoH(level_ind_h, level_ind_d, n_rows*sizeof(uint)));
+    // Construct the (sorted) level array
+    uint *levels_h = (uint*)malloc(n_rows*sizeof(uint));
+    for (uint i=0; i<n_rows; i++) {
+        uint row_level = level_ind_h[i]; // Row i belongs to level row_level
+        levels_h[m_level_ptr_h[row_level]] = i;
+        m_level_ptr_h[row_level]++;
+    }
 
-    // Copy stuff to the GPU
-    // CSR Matrix arrays
-    cuda_check(cuMemAlloc(&m_rows_d, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_rows_d, rows, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemAlloc(&m_cols_d, n_entries*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_cols_d, cols, n_entries*sizeof(uint)));
-    cuda_check(cuMemAlloc(&m_data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyHtoD(m_data_d, data, n_entries*sizeof(Float)));
-    // Solve data structure
+    // Undo the modifications to m_level_ptr from the previous step
+    for(uint i = 0, last = 0; i <= level; i++){
+        uint temp = m_level_ptr_h[i];
+        m_level_ptr_h[i] = last;
+        last = temp;
+    }
+
     cuda_check(cuMemAlloc(&m_level_ptr_d, m_level_ptr_h.size()*sizeof(uint)));
     cuda_check(cuMemcpyHtoD(m_level_ptr_d, &m_level_ptr_h[0], m_level_ptr_h.size()*sizeof(uint)));
     cuda_check(cuMemAlloc(&m_levels_d, n_rows*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_levels_d, &levels[0], n_rows*sizeof(uint)));
+    cuda_check(cuMemcpyHtoD(m_levels_d, levels_h, n_rows*sizeof(uint)));
     // RHS and solution
     cuda_check(cuMemAlloc(&m_b_d, n_rows*sizeof(Float)));
     cuda_check(cuMemAlloc(&m_x_d, n_rows*sizeof(Float)));
+
+    free(levels_h);
+    free(level_ind_h);
+    cuda_check(cuMemFree(level_ind_d));
+    cuda_check(cuMemFree(level_count_d));
 }
 
 template<typename Float>
 SparseTriangularSolver<Float>::~SparseTriangularSolver() {
-    cuda_check(cuMemFree(m_rows_d));
-    cuda_check(cuMemFree(m_cols_d));
-    cuda_check(cuMemFree(m_data_d));
     cuda_check(cuMemFree(m_level_ptr_d));
     cuda_check(cuMemFree(m_levels_d));
     cuda_check(cuMemFree(m_b_d));
@@ -154,7 +179,6 @@ std::vector<Float> SparseTriangularSolver<Float>::solve(Float *b) {
     cuda_check(cuMemcpyDtoH(x_h, m_x_d, m_n_rows*sizeof(Float)));
     return std::vector<Float>(x_h, x_h+m_n_rows);
 }
-
 
 template class SparseTriangularSolver<float>;
 template class SparseTriangularSolver<double>;
