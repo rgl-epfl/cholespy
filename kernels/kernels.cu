@@ -74,76 +74,72 @@ extern "C" __global__ void find_roots_in_candidates(uint n_rows, uint level, uin
 
 // Solve kernels
 
+__device__ int stack_id = 0;
+
 template<typename Float>
-__device__ void solve_row_multiblock(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
-    uint row_idx = level_ptr[level] + blockDim.x * blockIdx.x + threadIdx.x;
-    if (row_idx >= level_ptr[level+1])
+__device__ void solve_lower(uint nrows, uint *levels, volatile bool *solved_rows, uint* rows, uint* columns, Float* values, volatile Float* x) {
+    int lvl_idx = atomicAdd(&stack_id, 1);
+    if (lvl_idx >= nrows)
         return;
-    uint row = levels[row_idx];
+
+    uint row = levels[lvl_idx];
+    uint row_start = rows[row];
+    uint row_end = rows[row + 1] - 1;
+    Float diag_entry = values[row_end];
+    Float r = x[row];
+    uint col;
+    for (uint i=row_start; i<row_end; i++) {
+        col = columns[i];
+        // Busy wait for the corresponding entry in x to be solved
+        while (!solved_rows[col])
+            continue;
+        r -= values[i] * x[col];
+    }
+    x[row] = r / diag_entry;
+    // Signal other threads that this entry is available
+    solved_rows[row] = true;
+    if (lvl_idx == nrows-1)
+        stack_id = 0;
+}
+
+template<typename Float>
+__device__ void solve_upper(uint nrows, uint *levels, volatile bool *solved_rows, uint* rows, uint* columns, Float* values, volatile Float* x) {
+    int lvl_idx = atomicAdd(&stack_id, 1);
+    if (lvl_idx >= nrows)
+        return;
+
+    uint row = levels[lvl_idx];
     uint row_start = rows[row];
     uint row_end = rows[row + 1];
-    uint diag_ptr;
-    if (lower) {
-        diag_ptr = row_end - 1;
-        row_end--;
-    } else {
-        diag_ptr = row_start;
-        row_start++;
+    Float diag_entry = values[row_start];
+    Float r = x[row];
+    uint col;
+    for (uint i=row_end-1; i>row_start; i--) {
+        col = columns[i];
+        // Busy wait for the corresponding entry in x to be solved
+        while (!solved_rows[col])
+            continue;
+        r -= values[i] * x[col];
     }
-
-    Float r = 0.0f;
-    for (uint i=row_start; i<row_end; i++) {
-        r += values[i]*x[columns[i]];
-    }
-
-    x[row] -= r;
-    x[row] /= values[diag_ptr];
+    x[row] = r / diag_entry;
+    // Signal other threads that this entry is available
+    solved_rows[row] = true;
+    if (lvl_idx == nrows-1)
+        stack_id = 0;
 }
 
-template<typename Float>
-__device__ void solve_chain(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, Float* values, Float* b, Float* x, bool lower) {
-    for (uint level=chain_start; level<chain_end; level++) {
-        uint level_start = level_ptr[level];
-        uint level_end = level_ptr[level+1];
-        uint row_idx = level_start + threadIdx.x;
-        if (row_idx < level_end) {
-            uint row = levels[row_idx];
-            uint row_start = rows[row];
-            uint row_end = rows[row + 1];
-            uint diag_ptr;
-            if (lower) {
-                diag_ptr = row_end - 1;
-                row_end--;
-            } else {
-                diag_ptr = row_start;
-                row_start++;
-            }
-
-            Float r = 0.0f;
-            for (uint i=row_start; i<row_end; i++) {
-                r += values[i]*x[columns[i]];
-            }
-
-            x[row] -= r;
-            x[row] /= values[diag_ptr];
-        }
-        __syncthreads(); // Synchronize before moving to next level
-    }
+extern "C" __global__ void solve_lower_float(uint nrows, uint*levels, bool *solved_rows, uint *rows, uint *columns, float *values, float*x) {
+    solve_lower<float>(nrows, levels, solved_rows, rows, columns, values, x);
 }
 
-
-extern "C" __global__ void solve_row_multiblock_float(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, float* values, float* b, float* x, bool lower) {
-    solve_row_multiblock<float>(level, level_ptr, levels, rows, columns, values, b, x, lower);
+extern "C" __global__ void solve_lower_double(uint nrows, uint*levels, bool *solved_rows, uint *rows, uint *columns, double *values, double*x) {
+    solve_lower<double>(nrows, levels, solved_rows, rows, columns, values, x);
 }
 
-extern "C" __global__ void solve_row_multiblock_double(uint level, uint* level_ptr, uint *levels, uint* rows, uint* columns, double* values, double* b, double* x, bool lower) {
-    solve_row_multiblock<double>(level, level_ptr, levels, rows, columns, values, b, x, lower);
+extern "C" __global__ void solve_upper_float(uint nrows, uint*levels, bool *solved_rows, uint *rows, uint *columns, float *values, float*x) {
+    solve_upper<float>(nrows, levels, solved_rows, rows, columns, values, x);
 }
 
-extern "C" __global__ void solve_chain_float(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, float* values, float* b, float* x, bool lower) {
-    solve_chain<float>(chain_start, chain_end, level_ptr, levels, rows, columns, values, b, x, lower);
-}
-
-extern "C" __global__ void solve_chain_double(uint chain_start, uint chain_end, uint *level_ptr, uint *levels, uint* rows, uint* columns, double* values, double* b, double* x, bool lower) {
-    solve_chain<double>(chain_start, chain_end, level_ptr, levels, rows, columns, values, b, x, lower);
+extern "C" __global__ void solve_upper_double(uint nrows, uint*levels, bool *solved_rows, uint *rows, uint *columns, double *values, double*x) {
+    solve_upper<double>(nrows, levels, solved_rows, rows, columns, values, x);
 }

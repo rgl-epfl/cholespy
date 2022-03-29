@@ -31,8 +31,6 @@ private:
     std::vector<uint> m_level_ptr_h;//TODO: is this really necessary?
     // Sorted indices of rows in each level
     CUdeviceptr m_levels_d;
-    // RHS GPU address
-    CUdeviceptr m_b_d;
     // Solution GPU address
     CUdeviceptr m_x_d;
 };

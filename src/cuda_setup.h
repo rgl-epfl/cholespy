@@ -10,6 +10,8 @@ CUcontext cu_context;
 CUmodule cu_module;
 CUfunction solve_chain;
 CUfunction solve_row_multiblock;
+CUfunction solve_upper;
+CUfunction solve_lower;
 CUfunction find_roots;
 CUfunction analyze;
 CUfunction find_roots_in_candidates;
@@ -25,9 +27,13 @@ void initCuda() {
     if (std::is_same_v<Float, float>) {
         cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_float"));
         cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_float"));
+        cuda_check(cuModuleGetFunction(&solve_lower, cu_module, (char *)"solve_lower_float"));
+        cuda_check(cuModuleGetFunction(&solve_upper, cu_module, (char *)"solve_upper_float"));
     } else {
         cuda_check(cuModuleGetFunction(&solve_chain, cu_module, (char *)"solve_chain_double"));
         cuda_check(cuModuleGetFunction(&solve_row_multiblock, cu_module, (char *)"solve_row_multiblock_double"));
+        cuda_check(cuModuleGetFunction(&solve_lower, cu_module, (char *)"solve_lower_double"));
+        cuda_check(cuModuleGetFunction(&solve_upper, cu_module, (char *)"solve_upper_double"));
     }
     cuda_check(cuModuleGetFunction(&find_roots, cu_module, (char *)"find_roots"));
     cuda_check(cuModuleGetFunction(&analyze, cu_module, (char *)"analyze"));

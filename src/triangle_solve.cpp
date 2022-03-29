@@ -3,6 +3,8 @@
 // TODO: This is a bit dirty, there's probably a better way
 extern CUfunction solve_chain;
 extern CUfunction solve_row_multiblock;
+extern CUfunction solve_lower;
+extern CUfunction solve_upper;
 extern CUfunction find_roots;
 extern CUfunction analyze;
 extern CUfunction find_roots_in_candidates;
@@ -130,9 +132,8 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
     cuda_check(cuMemAlloc(&m_level_ptr_d, m_level_ptr_h.size()*sizeof(uint)));
     cuda_check(cuMemcpyHtoD(m_level_ptr_d, &m_level_ptr_h[0], m_level_ptr_h.size()*sizeof(uint)));
     cuda_check(cuMemAlloc(&m_levels_d, n_rows*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_levels_d, levels_h, n_rows*sizeof(uint)));
-    // RHS and solution
-    cuda_check(cuMemAlloc(&m_b_d, n_rows*sizeof(Float)));
+    cuda_check(cuMemcpyHtoDAsync(m_levels_d, levels_h, n_rows*sizeof(uint), 0));
+    // solution
     cuda_check(cuMemAlloc(&m_x_d, n_rows*sizeof(Float)));
 
     free(levels_h);
@@ -145,38 +146,36 @@ template<typename Float>
 SparseTriangularSolver<Float>::~SparseTriangularSolver() {
     cuda_check(cuMemFree(m_level_ptr_d));
     cuda_check(cuMemFree(m_levels_d));
-    cuda_check(cuMemFree(m_b_d));
     cuda_check(cuMemFree(m_x_d));
 }
 
 template<typename Float>
 std::vector<Float> SparseTriangularSolver<Float>::solve(Float *b) {
 
-    cuda_check(cuMemcpyHtoD(m_b_d, b, m_n_rows*sizeof(Float)));
-    cuda_check(cuMemcpyHtoD(m_x_d, b, m_n_rows*sizeof(Float)));//TODO: device to device copy instead?
+    cuda_check(cuMemcpyHtoDAsync(m_x_d, b, m_n_rows*sizeof(Float), 0));
 
-    for (int i=0; i<m_chain_ptr.size()-1; i++) {
-        if (m_chain_ptr[i]+1 == m_chain_ptr[i+1]){
-            // Multi block kernel
-            //TODO: this requires storing level_ptr on the CPU, is this really necessary?
-            int num_blocks = (m_level_ptr_h[m_chain_ptr[i+1]] - m_level_ptr_h[m_chain_ptr[i]] + BLOCK_SIZE - 1) / BLOCK_SIZE;
-            void *args[9] = {&m_chain_ptr[i], &m_level_ptr_d, &m_levels_d, &m_rows_d, &m_cols_d, &m_data_d, &m_b_d, &m_x_d, &m_lower};
-            cuda_check(cuLaunchKernel(solve_row_multiblock,
-                            num_blocks, 1, 1,
-                            BLOCK_SIZE, 1, 1,
-                            0, 0, args, 0));
-        } else {
-            // Chain fits in one block
-            void *args[10] = {&m_chain_ptr[i], &m_chain_ptr[i+1], &m_level_ptr_d, &m_levels_d, &m_rows_d, &m_cols_d, &m_data_d, &m_b_d, &m_x_d, &m_lower};
-            cuda_check(cuLaunchKernel(solve_chain,
+    CUdeviceptr solved_rows;
+    cuda_check(cuMemAlloc(&solved_rows, m_n_rows*sizeof(bool)));
+    cuda_check(cuMemsetD8(solved_rows, 0, m_n_rows)); // Initialize to all false
+
+    void *args[7] = {
+        &m_n_rows,
+        &m_levels_d,
+        &solved_rows,
+        &m_rows_d,
+        &m_cols_d,
+        &m_data_d,
+        &m_x_d,
+    };
+    CUfunction solve_kernel = (m_lower ? solve_lower : solve_upper);
+    cuda_check(cuLaunchKernel(solve_kernel,
+                            m_n_rows, 1, 1,
                             1, 1, 1,
-                            BLOCK_SIZE, 1, 1,
                             0, 0, args, 0));
-        }
-    }
 
     Float *x_h = (Float*) malloc(m_n_rows*sizeof(Float));
-    cuda_check(cuMemcpyDtoH(x_h, m_x_d, m_n_rows*sizeof(Float)));
+    cuda_check(cuMemcpyDtoHAsync(x_h, m_x_d, m_n_rows*sizeof(Float), 0));
+    cuda_check(cuMemFree(solved_rows));
     return std::vector<Float>(x_h, x_h+m_n_rows);
 }
 
