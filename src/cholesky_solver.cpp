@@ -100,20 +100,19 @@ CholeskySolver<Float>::CholeskySolver(uint n_verts, uint n_faces, uint *faces, F
 
     // CSC Matrix arrays
     cuda_check(cuMemAlloc(&m_csc_cols_d, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_csc_cols_d, lower_csc->p, (1+n_rows)*sizeof(uint)));
+    cuda_check(cuMemcpyHtoDAsync(m_csc_cols_d, lower_csc->p, (1+n_rows)*sizeof(uint), 0));
     cuda_check(cuMemAlloc(&m_csc_rows_d, n_entries*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_csc_rows_d, lower_csc->i, n_entries*sizeof(uint)));
+    cuda_check(cuMemcpyHtoDAsync(m_csc_rows_d, lower_csc->i, n_entries*sizeof(uint), 0));
     cuda_check(cuMemAlloc(&m_csc_data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyHtoD(m_csc_data_d, csc_data, n_entries*sizeof(Float)));
+    cuda_check(cuMemcpyHtoDAsync(m_csc_data_d, csc_data, n_entries*sizeof(Float), 0));
 
     // CSR Matrix arrays
     cuda_check(cuMemAlloc(&m_csr_rows_d, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_csr_rows_d, lower_csr->p, (1+n_rows)*sizeof(uint)));
+    cuda_check(cuMemcpyHtoDAsync(m_csr_rows_d, lower_csr->p, (1+n_rows)*sizeof(uint), 0));
     cuda_check(cuMemAlloc(&m_csr_cols_d, n_entries*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_csr_cols_d, lower_csr->i, n_entries*sizeof(uint)));
+    cuda_check(cuMemcpyHtoDAsync(m_csr_cols_d, lower_csr->i, n_entries*sizeof(uint), 0));
     cuda_check(cuMemAlloc(&m_csr_data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyHtoD(m_csr_data_d, csr_data, n_entries*sizeof(Float)));
-
+    cuda_check(cuMemcpyHtoDAsync(m_csr_data_d, csr_data, n_entries*sizeof(Float), 0));
 
     m_solver_l = new SparseTriangularSolver<Float>(n_rows, n_entries, m_csc_cols_d, m_csc_rows_d, m_csr_rows_d, m_csr_cols_d, m_csr_data_d, true);
     // To prepare the transpose we merely need to swap the roles of the CSR and CSC representations (CSC rows -> CSR cols, CSC cols -> CSR rows)

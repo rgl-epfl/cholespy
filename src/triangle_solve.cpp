@@ -37,7 +37,7 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
     CUdeviceptr level_count_d;
     uint level_count_h = 0;
     cuda_check(cuMemAlloc(&level_count_d, sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(level_count_d, &level_count_h, sizeof(uint)));
+    cuda_check(cuMemcpyHtoDAsync(level_count_d, &level_count_h, sizeof(uint), 0));
 
     // Row i belongs in level level_ind[i]
     uint *level_ind_h = (uint *)malloc(n_rows*sizeof(uint));
@@ -59,7 +59,7 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
                             BLOCK_SIZE, 1, 1,
                             0, 0, fr_args, 0));
 
-    cuda_check(cuMemcpyDtoH(&level_count_h, level_count_d, sizeof(uint)));
+    cuda_check(cuMemcpyDtoHAsync(&level_count_h, level_count_d, sizeof(uint), 0));
     m_level_ptr_h.push_back(level_count_h);
 
     if (level_count_h > BLOCK_SIZE) {
@@ -87,7 +87,7 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
 
         //update level count
         level_count_prev = level_count_h;
-        cuda_check(cuMemcpyDtoH(&level_count_h, level_count_d, sizeof(uint)));
+        cuda_check(cuMemcpyDtoHAsync(&level_count_h, level_count_d, sizeof(uint), 0));
         level_size = level_count_h - level_count_prev;
         m_level_ptr_h.push_back(level_count_h);
 
@@ -113,7 +113,7 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
     m_level_ptr_h.shrink_to_fit();
 
     // Build the actual solve data structure
-    cuda_check(cuMemcpyDtoH(level_ind_h, level_ind_d, n_rows*sizeof(uint)));
+    cuda_check(cuMemcpyDtoHAsync(level_ind_h, level_ind_d, n_rows*sizeof(uint), 0));
     // Construct the (sorted) level array
     uint *levels_h = (uint*)malloc(n_rows*sizeof(uint));
     for (uint i=0; i<n_rows; i++) {
@@ -130,7 +130,7 @@ SparseTriangularSolver<Float>::SparseTriangularSolver(uint n_rows, uint n_entrie
     }
 
     cuda_check(cuMemAlloc(&m_level_ptr_d, m_level_ptr_h.size()*sizeof(uint)));
-    cuda_check(cuMemcpyHtoD(m_level_ptr_d, &m_level_ptr_h[0], m_level_ptr_h.size()*sizeof(uint)));
+    cuda_check(cuMemcpyHtoDAsync(m_level_ptr_d, &m_level_ptr_h[0], m_level_ptr_h.size()*sizeof(uint), 0));
     cuda_check(cuMemAlloc(&m_levels_d, n_rows*sizeof(uint)));
     cuda_check(cuMemcpyHtoDAsync(m_levels_d, levels_h, n_rows*sizeof(uint), 0));
     // solution
