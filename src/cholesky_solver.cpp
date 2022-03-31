@@ -1,12 +1,7 @@
 #include "cholesky_solver.h"
-#include "cuda_setup.h"
 
 template <typename Float>
 CholeskySolver<Float>::CholeskySolver(uint n_verts, uint n_faces, uint *faces, Float lambda) {
-
-    // Initialize CUDA and load the kernels if not already done
-    if (!init)
-        initCuda<Float>();
 
     Laplacian<Float> L(n_verts, n_faces, faces, lambda);
 
@@ -86,37 +81,13 @@ CholeskySolver<Float>::CholeskySolver(uint n_verts, uint n_faces, uint *faces, F
         }
     }
 
-    /*
-        The constructor of the SparseTriangularSolver class takes as argument
-        the CSC and CSR representations of the matrix. This is convenient since
-        the CSR representation of the lower triangular matrix is the CSC of the
-        upper one (and vice versa). Therefore we upload to the GPU the CSC
-        representation of the lower and of its transpose, and then swap the
-        pointers in the constructors.
-    */
-
     uint n_rows = lower_csc->nrow;
     uint n_entries = lower_csc->nzmax;
-
-    // CSC Matrix arrays
-    cuda_check(cuMemAlloc(&m_csc_cols_d, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(m_csc_cols_d, lower_csc->p, (1+n_rows)*sizeof(uint), 0));
-    cuda_check(cuMemAlloc(&m_csc_rows_d, n_entries*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(m_csc_rows_d, lower_csc->i, n_entries*sizeof(uint), 0));
-    cuda_check(cuMemAlloc(&m_csc_data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyHtoDAsync(m_csc_data_d, csc_data, n_entries*sizeof(Float), 0));
-
-    // CSR Matrix arrays
-    cuda_check(cuMemAlloc(&m_csr_rows_d, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(m_csr_rows_d, lower_csr->p, (1+n_rows)*sizeof(uint), 0));
-    cuda_check(cuMemAlloc(&m_csr_cols_d, n_entries*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(m_csr_cols_d, lower_csr->i, n_entries*sizeof(uint), 0));
-    cuda_check(cuMemAlloc(&m_csr_data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyHtoDAsync(m_csr_data_d, csr_data, n_entries*sizeof(Float), 0));
-
-    m_solver_l = new SparseTriangularSolver<Float>(n_rows, n_entries, m_csc_cols_d, m_csc_rows_d, m_csr_rows_d, m_csr_cols_d, m_csr_data_d, true);
+    // The CSC representation of a matrix is the same as the CSR of its transpose
+    m_solver_l = new SparseTriangularSolver<Float>(n_rows, n_entries, (uint *)lower_csr->p, (uint *)lower_csr->i, csr_data, true);
     // To prepare the transpose we merely need to swap the roles of the CSR and CSC representations (CSC rows -> CSR cols, CSC cols -> CSR rows)
-    m_solver_u = new SparseTriangularSolver<Float>(n_rows, n_entries, m_csr_rows_d, m_csr_cols_d, m_csc_cols_d, m_csc_rows_d, m_csc_data_d, false);
+    m_solver_u = new SparseTriangularSolver<Float>(n_rows, n_entries, (uint *)lower_csc->p, (uint *)lower_csc->i, csc_data, false);
+
 
     // Free CHOLMOD stuff
     cholmod_free_sparse(&A, &c);
@@ -128,10 +99,12 @@ CholeskySolver<Float>::CholeskySolver(uint n_verts, uint n_faces, uint *faces, F
         free(csc_data);
         free(csr_data);
     }
+
 }
 
 template <typename Float>
 std::vector <Float> CholeskySolver<Float>::solve(Float *b) {
+
     std::vector<Float> tmp, sol;
     sol.resize(m_n, 0.);
     tmp.resize(m_n, 0.);
@@ -139,7 +112,7 @@ std::vector <Float> CholeskySolver<Float>::solve(Float *b) {
     for (uint i=0; i<m_n; i++)
         tmp[i] = b[m_perm[i]];
 
-    tmp = m_solver_l->solve(&tmp[0]);
+    tmp = m_solver_l->solve(&tmp[0]);//TODO: we port back and forth on the gpu between the 2 solves, don't do that
     tmp = m_solver_u->solve(&tmp[0]);
 
     for (uint i=0; i<m_n; i++)
@@ -150,12 +123,6 @@ std::vector <Float> CholeskySolver<Float>::solve(Float *b) {
 
 template <typename Float>
 CholeskySolver<Float>::~CholeskySolver() {
-    cuda_check(cuMemFree(m_csr_rows_d));
-    cuda_check(cuMemFree(m_csr_cols_d));
-    cuda_check(cuMemFree(m_csr_data_d));
-    cuda_check(cuMemFree(m_csc_rows_d));
-    cuda_check(cuMemFree(m_csc_cols_d));
-    cuda_check(cuMemFree(m_csc_data_d));
     free(m_perm);
 }
 
