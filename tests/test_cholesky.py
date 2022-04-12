@@ -1,10 +1,29 @@
 import pytest
 from cholesky import CholeskySolverD, CholeskySolverF
-from cholesky import LaplacianD, LaplacianF
 from drjit.llvm import Int, Float32, Float64
 import numpy as np
 import sksparse.cholmod as cholmod
 import scipy.sparse as sp
+
+def build_matrix(n_verts, faces, lambda_):
+
+    # Neighbor indices
+    ii = faces[:, [1, 2, 0]].flatten()
+    jj = faces[:, [2, 0, 1]].flatten()
+    adj = np.unique(np.stack([np.concatenate([ii, jj]), np.concatenate([jj, ii])], axis=0), axis=1)
+    adj_values = np.ones(adj.shape[1], dtype=np.float)
+
+    # Diagonal indices
+    diag_idx = adj[0]
+
+    # Build the sparse matrix
+    idx = np.concatenate((adj, np.stack((diag_idx, diag_idx), axis=0)), axis=1)
+    values = np.concatenate((-adj_values, adj_values))
+
+    L = sp.csc_matrix((values, idx))
+    eye = sp.eye(n_verts).tocsc()
+
+    return L * lambda_ + eye
 
 def test_cube_float():
     n_verts = 8
@@ -14,8 +33,7 @@ def test_cube_float():
     faces_numpy = np.array([0, 1, 3, 0, 3, 2, 2, 3, 7, 2, 7, 6, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4, 1, 5, 7, 1, 7, 3, 0, 4, 6, 0, 6, 2])
     faces = Int(faces_numpy)
 
-    L = LaplacianF(n_verts, n_faces, faces.data_(), lambda_)
-    L_sp = sp.csc_matrix((L.data(), L.rows(), L.col_ptr()))
+    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     solver = CholeskySolverF(n_verts, n_faces, faces.data_(), lambda_)
@@ -33,8 +51,7 @@ def test_cube_double():
     faces_numpy = np.array([0, 1, 3, 0, 3, 2, 2, 3, 7, 2, 7, 6, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4, 1, 5, 7, 1, 7, 3, 0, 4, 6, 0, 6, 2])
     faces = Int(faces_numpy)
 
-    L = LaplacianD(n_verts, n_faces, faces.data_(), lambda_)
-    L_sp = sp.csc_matrix((L.data(), L.rows(), L.col_ptr()))
+    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     solver = CholeskySolverD(n_verts, n_faces, faces.data_(), lambda_)
@@ -57,8 +74,7 @@ def test_ico_float():
     faces_numpy = f.flatten()
     faces = Int(faces_numpy)
 
-    L = LaplacianF(n_verts, n_faces, faces.data_(), lambda_)
-    L_sp = sp.csc_matrix((L.data(), L.rows(), L.col_ptr()))
+    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     solver = CholeskySolverF(n_verts, n_faces, faces.data_(), lambda_)
@@ -81,8 +97,7 @@ def test_ico_double():
     faces_numpy = f.flatten()
     faces = Int(faces_numpy)
 
-    L = LaplacianD(n_verts, n_faces, faces.data_(), lambda_)
-    L_sp = sp.csc_matrix((L.data(), L.rows(), L.col_ptr()))
+    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     solver = CholeskySolverD(n_verts, n_faces, faces.data_(), lambda_)

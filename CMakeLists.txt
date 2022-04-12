@@ -24,12 +24,9 @@ find_package(SuiteSparse CONFIG REQUIRED)
 add_library(
   cholesky_cuda STATIC
 
-  src/cuda_setup.h
-  src/cuda_helpers.h           src/cuda_helpers.cpp
-  src/cholesky_solver.h      src/cholesky_solver.cpp
-  src/triangle_solve.h       src/triangle_solve.cpp
-  src/laplacian.h            src/laplacian.cpp
   kernels/kernels.h
+  src/cuda_setup.h
+  src/cholesky_solver.h      src/cholesky_solver.cpp
 )
 
 set_property(TARGET cholesky_cuda PROPERTY POSITION_INDEPENDENT_CODE ON)
