@@ -1,9 +1,13 @@
 #include "cholesky_solver.h"
 #include "cuda_setup.h"
 #include <algorithm>
+#include <exception>
 
 template <typename Float>
 CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
+
+    if (nrhs >= 128)
+        throw std::invalid_argument("The number of RHS should be less than 128.");
 
     // Initialize CUDA and load the kernels if not already done
     initCuda();
