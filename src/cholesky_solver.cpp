@@ -6,7 +6,7 @@ template <typename Float>
 CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
 
     // Initialize CUDA and load the kernels if not already done
-    initCuda<Float>();
+    initCuda();
 
     // Placeholders for the CSC matrix data
     std::vector<int> col_ptr, rows;
@@ -367,7 +367,13 @@ void CholeskySolver<Float>::solve(bool lower) {
         &data_d,
         &m_x_d,
     };
-    CUfunction solve_kernel = (lower ? solve_lower : solve_upper);
+
+    CUfunction solve_kernel;
+    if(std::is_same_v<Float, float>)
+        solve_kernel = (lower ? solve_lower_float : solve_upper_float);
+    else
+        solve_kernel = (lower ? solve_lower_double : solve_upper_double);
+
     cuda_check(cuLaunchKernel(solve_kernel,
                             m_n, 1, 1,
                             128, 1, 1,
