@@ -7,7 +7,7 @@
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(uint n_verts, uint n_faces, uint* faces, double lambda);
+    CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint* faces, double lambda);
 
     ~CholeskySolver();
 
@@ -28,6 +28,7 @@ private:
 	// Solve one triangular system
     void solve(bool lower);
 
+    uint m_nrhs;
     uint m_n;
     uint *m_perm;
 
@@ -43,6 +44,9 @@ private:
 
     // Mask of already processed rows, usesd for both analysis and solve
     CUdeviceptr m_processed_rows_d;
+
+    // ID of current row being processed by a given block
+    CUdeviceptr m_stack_id_d;
 
     // Sorted indices of rows in each level
     CUdeviceptr m_lower_levels_d;

@@ -3,7 +3,7 @@
 #include <algorithm>
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(uint n_verts, uint n_faces, uint *faces, double lambda) : m_n(n_verts) {
+CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
 
     // Initialize CUDA and load the kernels if not already done
     if (!init)
@@ -12,17 +12,23 @@ CholeskySolver<Float>::CholeskySolver(uint n_verts, uint n_faces, uint *faces, d
     // Placeholders for the CSC matrix data
     std::vector<int> col_ptr, rows;
     std::vector<double> data;
+
     // Build the actual matrix
     build_matrix(n_verts, n_faces, faces, lambda, col_ptr, rows, data);
 
+    // Mask of rows already processed
     cuda_check(cuMemAlloc(&m_processed_rows_d, m_n*sizeof(bool)));
     cuda_check(cuMemsetD8(m_processed_rows_d, 0, m_n)); // Initialize to all false
+
+    // Row id
+    cuda_check(cuMemAlloc(&m_stack_id_d, sizeof(uint)));
+    cuda_check(cuMemsetD32(m_stack_id_d, 0, 1));
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
     factorize(col_ptr, rows, data);
 
     // Allocate space for the solution
-    cuda_check(cuMemAlloc(&m_x_d, m_n*sizeof(Float)));
+    cuda_check(cuMemAlloc(&m_x_d, m_n*m_nrhs*sizeof(Float)));
 }
 
 template <typename Float>
@@ -173,7 +179,7 @@ void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int
 
     c.supernodal = CHOLMOD_SIMPLICIAL; // TODO: if using Cholmod to solve, try with supernodal here
     c.final_ll = 1; // compute LL' factorization instead of LDL´ (default for simplicial)
-    c.print = 5; // log level
+    c.print = 5; // log level TODO: Remove
     //TODO: Not sure this is necessary, need to benchmark
     c.nmethods = 1;
     c.method[0].ordering = CHOLMOD_NESDIS;
@@ -234,6 +240,7 @@ void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int
             csr_data[i] = (Float) csr_data_ptr[i];
         }
     }
+
 
     uint n_rows = lower_csc->nrow;
     uint n_entries = lower_csc->nzmax;
@@ -343,13 +350,17 @@ template<typename Float>
 void CholeskySolver<Float>::solve(bool lower) {
     // Initialize buffers
     cuda_check(cuMemsetD8(m_processed_rows_d, 0, m_n)); // Initialize to all false
+    cuda_check(cuMemsetD32(m_stack_id_d, 0, 1));
+
     CUdeviceptr rows_d = (lower ? m_lower_rows_d : m_upper_rows_d);
     CUdeviceptr cols_d = (lower ? m_lower_cols_d : m_upper_cols_d);
     CUdeviceptr data_d = (lower ? m_lower_data_d : m_upper_data_d);
     CUdeviceptr levels_d = (lower ? m_lower_levels_d : m_upper_levels_d);
 
-    void *args[7] = {
+    void *args[9] = {
+        &m_nrhs,
         &m_n,
+        &m_stack_id_d,
         &levels_d,
         &m_processed_rows_d,
         &rows_d,
@@ -360,7 +371,7 @@ void CholeskySolver<Float>::solve(bool lower) {
     CUfunction solve_kernel = (lower ? solve_lower : solve_upper);
     cuda_check(cuLaunchKernel(solve_kernel,
                             m_n, 1, 1,
-                            1, 1, 1,
+                            128, 1, 1,
                             0, 0, args, 0));
 }
 
@@ -368,21 +379,24 @@ template <typename Float>
 std::vector<Float> CholeskySolver<Float>::solve(Float *b) {
     // TODO fallback to cholmod in the CPU array case
     // TODO: Do this on the GPU?
-    Float *tmp = (Float *)malloc(m_n * sizeof(Float));
-    for (uint i=0; i<m_n; i++)
-        tmp[i] = b[m_perm[i]];
+    Float *tmp = (Float *)malloc(m_n * m_nrhs * sizeof(Float));
+    for (uint i=0; i<m_n; ++i)
+        for (uint j=0; j<m_nrhs; ++j) {
+            tmp[m_n * j + i] = b[m_n * j + m_perm[i]];
+        }
 
-    cuda_check(cuMemcpyHtoDAsync(m_x_d, tmp, m_n*sizeof(Float), 0));
+    cuda_check(cuMemcpyHtoDAsync(m_x_d, tmp, m_n*m_nrhs*sizeof(Float), 0));
 
     solve(true);
     solve(false);
 
-    cuda_check(cuMemcpyDtoHAsync(tmp, m_x_d, m_n*sizeof(Float), 0));
+    cuda_check(cuMemcpyDtoHAsync(tmp, m_x_d, m_n*m_nrhs*sizeof(Float), 0));
 
-	std::vector<Float> sol(m_n);
+	std::vector<Float> sol(m_n*m_nrhs);
     // Invert permutation
-    for (uint i=0; i<m_n; i++)
-        sol[m_perm[i]] = tmp[i];
+    for (uint i=0; i<m_n; ++i)
+        for (uint j=0; j<m_nrhs; ++j)
+            sol[m_n * j + m_perm[i]] = tmp[m_n * j + i];
 
     free(tmp);
     return sol;
@@ -393,6 +407,8 @@ CholeskySolver<Float>::~CholeskySolver() {
     free(m_perm);
 
     cuda_check(cuMemFree(m_processed_rows_d));
+
+    cuda_check(cuMemFree(m_stack_id_d));
 
     cuda_check(cuMemFree(m_x_d));
 

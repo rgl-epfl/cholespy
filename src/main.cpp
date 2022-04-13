@@ -12,8 +12,8 @@ void declare_cholesky(py::module &m, std::string typestr) {
     using Class = CholeskySolver<Float>;
     std::string class_name = std::string("CholeskySolver") + typestr;
     py::class_<Class>(m, class_name.c_str())
-        .def(py::init([](uint n_verts, uint n_faces, uintptr_t faces, double lambda){
-            return new Class(n_verts, n_faces, (uint *)faces, lambda);
+        .def(py::init([](uint nrhs, uint n_verts, uint n_faces, uintptr_t faces, double lambda){
+            return new Class(nrhs, n_verts, n_faces, (uint *)faces, lambda);
         }))
         .def("solve", [](Class &self, uintptr_t b_ptr){return self.solve((Float*) b_ptr);});
 }
