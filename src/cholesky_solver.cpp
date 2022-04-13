@@ -6,8 +6,7 @@ template <typename Float>
 CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
 
     // Initialize CUDA and load the kernels if not already done
-    if (!init)
-        initCuda<Float>();
+    initCuda<Float>();
 
     // Placeholders for the CSC matrix data
     std::vector<int> col_ptr, rows;
