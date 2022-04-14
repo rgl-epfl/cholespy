@@ -2,12 +2,12 @@ import sys
 
 try:
     from skbuild import setup
+    import nanobind
 except ImportError:
-    print(
-        "Please update pip, you need pip 10 or greater,\n"
-        " or you need to install the PEP 518 requirements in pyproject.toml yourself",
-        file=sys.stderr,
-    )
+    print("The preferred way to invoke 'setup.py' is via pip, as in 'pip "
+          "install .'. If you wish to run the setup script directly, you must "
+          "first install the build dependencies listed in pyproject.toml!",
+          file=sys.stderr)
     raise
 
 from setuptools import find_packages
@@ -22,5 +22,5 @@ setup(
     package_dir={"": "src"},
     cmake_install_dir="src/cholesky",
     include_package_data=True,
-    python_requires=">=3.6",
+    python_requires=">=3.8",
 )
