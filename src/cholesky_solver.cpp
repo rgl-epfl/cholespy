@@ -4,7 +4,7 @@
 #include <exception>
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
+CholeskySolver<Float>::CholeskySolver(int nrhs, int n_verts, int n_faces, int *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
 
     if (nrhs >= 128)
         throw std::invalid_argument("The number of RHS should be less than 128.");
@@ -24,7 +24,7 @@ CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uin
     cuda_check(cuMemsetD8(m_processed_rows_d, 0, m_n)); // Initialize to all false
 
     // Row id
-    cuda_check(cuMemAlloc(&m_stack_id_d, sizeof(uint)));
+    cuda_check(cuMemAlloc(&m_stack_id_d, sizeof(int)));
     cuda_check(cuMemsetD32(m_stack_id_d, 0, 1));
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
@@ -35,25 +35,25 @@ CholeskySolver<Float>::CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uin
 }
 
 template <typename Float>
-void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces, double lambda, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
+void CholeskySolver<Float>::build_matrix(int n_verts, int n_faces, int *faces, double lambda, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
     // We start by building the (lower half of the) (I + λ L) matrix in the COO format.
 
     // indices of nonzero entries
-    std::vector<uint> ii;
-    std::vector<uint> jj;
+    std::vector<int> ii;
+    std::vector<int> jj;
 
     // Heuristic based on average connectivity on a triangle mesh.
     ii.reserve(7 * n_verts);
     jj.reserve(7 * n_verts);
-    std::vector<uint> col_entries;
+    std::vector<int> col_entries;
     col_entries.resize(n_verts, 0);
 
     // Add one entry per edge
-    for (uint i=0; i<n_faces; i++) {
-        for (uint j=0; j<3; j++) {
-            for (uint k=j+1; k<3; k++) {
-                uint s = faces[3*i + j];
-                uint d = faces[3*i + k];
+    for (int i=0; i<n_faces; i++) {
+        for (int j=0; j<3; j++) {
+            for (int k=j+1; k<3; k++) {
+                int s = faces[3*i + j];
+                int d = faces[3*i + k];
                 if (s > d) {
                     // L[s,d]
                     ii.push_back(s);
@@ -70,7 +70,7 @@ void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces
     }
 
     // Add diagonal indices
-    for(uint i=0; i<n_verts; i++) {
+    for(int i=0; i<n_verts; i++) {
         ii.push_back(i);
         jj.push_back(i);
         col_entries[i]++;
@@ -79,21 +79,21 @@ void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces
     ii.shrink_to_fit();
     jj.shrink_to_fit();
 
-    uint nnz = ii.size();
+    int nnz = ii.size();
 
     // Then we convert the COO representation to CSC
 
-    std::vector<uint> tmp_col_ptr;
+    std::vector<int> tmp_col_ptr;
     tmp_col_ptr.resize(n_faces+1, 0);
-    std::vector<uint> tmp_rows;
+    std::vector<int> tmp_rows;
     tmp_rows.resize(nnz, 0);
 
     /*
     Build the column pointer array, where tmp_col_ptr[i] is the start of the
     i-th column in the other arrays
     */
-    uint cumsum=0;
-    for (uint i=0; i<n_verts; i++) {
+    int cumsum=0;
+    for (int i=0; i<n_verts; i++) {
         tmp_col_ptr[i] = cumsum;
         cumsum += col_entries[i];
     }
@@ -103,23 +103,23 @@ void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces
     Now move the row indices of each entry so that entries in column j are in
     positions tmp_col_ptr[j] to tmp_col_ptr[j+1]-1
     */
-    for (uint i=0; i<nnz; i++) {
-        uint col = jj[i];
-        uint dst = tmp_col_ptr[col];
+    for (int i=0; i<nnz; i++) {
+        int col = jj[i];
+        int dst = tmp_col_ptr[col];
 
         tmp_rows[dst] = ii[i];
         tmp_col_ptr[col]++;
     }
 
     // Undo the modifications to tmp_col_ptr from the previous step
-    for(uint i = 0, last = 0; i <= n_verts; i++){
-        uint temp = tmp_col_ptr[i];
+    for(int i = 0, last = 0; i <= n_verts; i++){
+        int temp = tmp_col_ptr[i];
         tmp_col_ptr[i] = last;
         last = temp;
     }
 
     // Sort indices in each column to ease the removal of duplicates
-    for (uint i=0; i<n_verts; i++) {
+    for (int i=0; i<n_verts; i++) {
         std::sort(tmp_rows.begin() + tmp_col_ptr[i], tmp_rows.begin() + tmp_col_ptr[i+1]);
     }
 
@@ -128,13 +128,13 @@ void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces
     col_ptr.resize(n_verts+1, 0);
     cumsum = 0;
 
-    std::vector<uint> adjacency;
+    std::vector<int> adjacency;
     adjacency.resize(n_verts, 0);
     // Remove duplicates
-    for (uint col=0; col<n_verts; col++) {
-        uint i = tmp_col_ptr[col];
-        uint n_elements = 0;
-        uint row = tmp_rows[i];
+    for (int col=0; col<n_verts; col++) {
+        int i = tmp_col_ptr[col];
+        int n_elements = 0;
+        int row = tmp_rows[i];
         while (i<tmp_col_ptr[col+1]) {
             if (row != col) {
                 // Count unique off diag entries per row
@@ -145,7 +145,7 @@ void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces
             rows.push_back(row);
             data.push_back(-lambda);
             n_elements++;
-            uint previous_row = row;
+            int previous_row = row;
             while (row == previous_row && i<tmp_col_ptr[col+1]) {
                 // Ignore duplicate entries (all off-diagonal entries of the laplacian are ones)
                 i++;
@@ -163,8 +163,8 @@ void CholeskySolver<Float>::build_matrix(uint n_verts, uint n_faces, uint *faces
     rows.shrink_to_fit();
 
     // Set diagonal indices proper values
-    for (uint j=0; j<n_verts; j++) {
-        for (uint i=col_ptr[j]; i<col_ptr[j+1]; i++) {
+    for (int j=0; j<n_verts; j++) {
+        for (int i=col_ptr[j]; i<col_ptr[j+1]; i++) {
             if (j == rows[i]) // diagonal element
                 data[i] = adjacency[j] * lambda + 1.0;
         }
@@ -198,14 +198,15 @@ void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int
         &c
     );
 
-    int *A_colptr = (int*) A->p;
-    int *A_rows = (int*) A->i;
+    // Copy the matrix contents in the CHOLMOD matrix
+    int *A_colptr = (int *) A->p;
+    int *A_rows = (int *) A->i;
     // CHOLMOD currently only supports the double precision version of the decomposition
     double *A_data = (double*) A->x;
-    for (uint j=0; j<m_n; j++) {
-        A_colptr[j] = (int) col_ptr[j];
-        for (uint i=col_ptr[j]; i<col_ptr[j+1]; i++) {
-            A_rows[i] = (int) rows[i];
+    for (int j=0; j<m_n; j++) {
+        A_colptr[j] = col_ptr[j];
+        for (int i=col_ptr[j]; i<col_ptr[j+1]; i++) {
+            A_rows[i] = rows[i];
             A_data[i] = data[i];
         }
     }
@@ -215,10 +216,10 @@ void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int
     cholmod_factorize(A, F, &c);
 
     // Copy permutation
-    m_perm = (uint*) malloc(m_n*sizeof(uint));
-    int *perm = (int*) F->Perm;
-    for (uint i=0; i<m_n; i++) {
-        m_perm[i] = (uint) perm[i];
+    m_perm = (int *) malloc(m_n*sizeof(int));
+    int *perm = (int *) F->Perm;
+    for (int i=0; i<m_n; i++) {
+        m_perm[i] = perm[i];
     }
 
     cholmod_sparse *lower_csc = cholmod_factor_to_sparse(F, &c);
@@ -238,15 +239,14 @@ void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int
         double *csc_data_ptr = (double *) lower_csc->x;
         double *csr_data_ptr = (double *) lower_csr->x;
 
-        for (uint32_t i=0; i < lower_csc->nzmax; i++) {
+        for (int32_t i=0; i < lower_csc->nzmax; i++) {
             csc_data[i] = (Float) csc_data_ptr[i];
             csr_data[i] = (Float) csr_data_ptr[i];
         }
     }
 
-
-    uint n_rows = lower_csc->nrow;
-    uint n_entries = lower_csc->nzmax;
+    int n_rows = lower_csc->nrow;
+    int n_entries = lower_csc->nzmax;
 
     // The CSC representation of a matrix is the same as the CSR of its transpose
     analyze(n_rows, n_entries, lower_csr->p, lower_csr->i, csr_data, true);
@@ -267,7 +267,7 @@ void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int
 }
 
 template <typename Float>
-void CholeskySolver<Float>::analyze(uint n_rows, uint n_entries, void *csr_rows, void *csr_cols, Float* csr_data, bool lower) {
+void CholeskySolver<Float>::analyze(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower) {
 
     CUdeviceptr *rows_d = (lower ? &m_lower_rows_d : &m_upper_rows_d);
     CUdeviceptr *cols_d = (lower ? &m_lower_cols_d : &m_upper_cols_d);
@@ -275,22 +275,22 @@ void CholeskySolver<Float>::analyze(uint n_rows, uint n_entries, void *csr_rows,
     CUdeviceptr *levels_d = (lower ? &m_lower_levels_d : &m_upper_levels_d);
 
     // CSR Matrix arrays
-    cuda_check(cuMemAlloc(rows_d, (1+n_rows)*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(*rows_d, csr_rows, (1+n_rows)*sizeof(uint), 0));
-    cuda_check(cuMemAlloc(cols_d, n_entries*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(*cols_d, csr_cols, n_entries*sizeof(uint), 0));
+    cuda_check(cuMemAlloc(rows_d, (1+n_rows)*sizeof(int)));
+    cuda_check(cuMemcpyHtoDAsync(*rows_d, csr_rows, (1+n_rows)*sizeof(int), 0));
+    cuda_check(cuMemAlloc(cols_d, n_entries*sizeof(int)));
+    cuda_check(cuMemcpyHtoDAsync(*cols_d, csr_cols, n_entries*sizeof(int), 0));
     cuda_check(cuMemAlloc(data_d, n_entries*sizeof(Float)));
     cuda_check(cuMemcpyHtoDAsync(*data_d, csr_data, n_entries*sizeof(Float), 0));
 
     // Row i belongs in level level_ind[i]
     CUdeviceptr level_ind_d;
-    cuda_check(cuMemAlloc(&level_ind_d, n_rows*sizeof(uint)));
+    cuda_check(cuMemAlloc(&level_ind_d, n_rows*sizeof(int)));
     cuda_check(cuMemsetD32(level_ind_d, 0, n_rows));
 
     cuda_check(cuMemsetD8(m_processed_rows_d, 0, n_rows)); // Initialize to all false
 
     CUdeviceptr max_lvl_d;
-    cuda_check(cuMemAlloc(&max_lvl_d, sizeof(uint)));
+    cuda_check(cuMemAlloc(&max_lvl_d, sizeof(int)));
     cuda_check(cuMemsetD32(max_lvl_d, 0, 1));
 
     void *args[6] = {
@@ -308,40 +308,40 @@ void CholeskySolver<Float>::analyze(uint n_rows, uint n_entries, void *csr_rows,
                             1, 1, 1,
                             0, 0, args, 0));
 
-    uint *level_ind_h = (uint *)malloc(n_rows*sizeof(uint));
-    cuda_check(cuMemcpyDtoHAsync(level_ind_h, level_ind_d, n_rows*sizeof(uint), 0));
+    int *level_ind_h = (int *) malloc(n_rows*sizeof(int));
+    cuda_check(cuMemcpyDtoHAsync(level_ind_h, level_ind_d, n_rows*sizeof(int), 0));
 
-    uint max_lvl_h = 0;
-    cuda_check(cuMemcpyDtoHAsync(&max_lvl_h, max_lvl_d, sizeof(uint), 0));
+    int max_lvl_h = 0;
+    cuda_check(cuMemcpyDtoHAsync(&max_lvl_h, max_lvl_d, sizeof(int), 0));
 
     // Construct the (sorted) level array
 
-    uint *levels_h = (uint*)malloc(n_rows*sizeof(uint));
+    int *levels_h = (int *) malloc(n_rows*sizeof(int));
 
-    std::vector<uint> level_ptr;
+    std::vector<int> level_ptr;
     level_ptr.resize(max_lvl_h + 1, 0);
 
     // TODO: Try to do some of this on the GPU, or maybe with drjit types?
     // Count the number of rows per level
-    for (uint i=0; i<n_rows; i++) {
+    for (int i=0; i<n_rows; i++) {
         level_ptr[1+level_ind_h[i]]++;
     }
 
     // Convert into the list of pointers to the start of each level
-    for (uint i=0, S=0; i<max_lvl_h; i++){
+    for (int i=0, S=0; i<max_lvl_h; i++){
         S += level_ptr[i+1];
         level_ptr[i+1] = S;
     }
 
     // Move all rows to their place in the level array
-    for (uint i=0; i<n_rows; i++) {
-        uint row_level = level_ind_h[i]; // Row i belongs to level row_level
+    for (int i=0; i<n_rows; i++) {
+        int row_level = level_ind_h[i]; // Row i belongs to level row_level
         levels_h[level_ptr[row_level]] = i;
         level_ptr[row_level]++;
     }
 
-    cuda_check(cuMemAlloc(levels_d, n_rows*sizeof(uint)));
-    cuda_check(cuMemcpyHtoDAsync(*levels_d, levels_h, n_rows*sizeof(uint), 0));
+    cuda_check(cuMemAlloc(levels_d, n_rows*sizeof(int)));
+    cuda_check(cuMemcpyHtoDAsync(*levels_d, levels_h, n_rows*sizeof(int), 0));
 
     // Free useless stuff
     free(levels_h);
@@ -389,8 +389,8 @@ std::vector<Float> CholeskySolver<Float>::solve(Float *b) {
     // TODO fallback to cholmod in the CPU array case
     // TODO: Do this on the GPU?
     Float *tmp = (Float *)malloc(m_n * m_nrhs * sizeof(Float));
-    for (uint i=0; i<m_n; ++i)
-        for (uint j=0; j<m_nrhs; ++j) {
+    for (int i=0; i<m_n; ++i)
+        for (int j=0; j<m_nrhs; ++j) {
             tmp[m_n * j + i] = b[m_n * j + m_perm[i]];
         }
 
@@ -403,8 +403,8 @@ std::vector<Float> CholeskySolver<Float>::solve(Float *b) {
 
 	std::vector<Float> sol(m_n*m_nrhs);
     // Invert permutation
-    for (uint i=0; i<m_n; ++i)
-        for (uint j=0; j<m_nrhs; ++j)
+    for (int i=0; i<m_n; ++i)
+        for (int j=0; j<m_nrhs; ++j)
             sol[m_n * j + m_perm[i]] = tmp[m_n * j + i];
 
     free(tmp);

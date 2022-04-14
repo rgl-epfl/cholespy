@@ -12,10 +12,10 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
     using Class = CholeskySolver<Float>;
     std::string class_name = std::string("CholeskySolver") + typestr;
     nb::class_<Class>(m, class_name.c_str())
-        .def("__init__", [](Class *self, uint nrhs, uint n_verts, uint n_faces, uintptr_t faces, double lambda){
-            new (self) Class(nrhs, n_verts, n_faces, (uint *)faces, lambda);
+        .def("__init__", [](Class *self, int nrhs, int n_verts, int n_faces, intptr_t faces, double lambda){
+            new (self) Class(nrhs, n_verts, n_faces, (int *)faces, lambda);
         })
-        .def("solve", [](Class &self, uintptr_t b_ptr){return self.solve((Float*) b_ptr);});
+        .def("solve", [](Class &self, intptr_t b_ptr){return self.solve((Float*) b_ptr);});
 }
 
 NB_MODULE(_cholesky_core, m) {

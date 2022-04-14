@@ -5,21 +5,21 @@
 
 __device__ int row_idx = 0;
 
-extern "C" __global__ void analysis_lower(uint n_rows, uint *max_lvl, volatile bool *analyzed_rows, volatile uint *row_levels, uint *rows, uint *cols) {
+extern "C" __global__ void analysis_lower(int n_rows, int *max_lvl, volatile bool *analyzed_rows, volatile int *row_levels, int *rows, int *cols) {
     int row = atomicAdd(&row_idx, 1);
     if (row >= n_rows)
         return;
 
-    uint row_start = rows[row];
-    uint row_end = rows[row + 1] - 1;
+    int row_start = rows[row];
+    int row_end = rows[row + 1] - 1;
 
-    uint col;
-    uint row_lvl = 0; // We determine to which level this row is going to be added
-    for (uint i=row_start; i<row_end; i++) {
+    int col;
+    int row_lvl = 0; // We determine to which level this row is going to be added
+    for (int i=row_start; i<row_end; i++) {
         col = cols[i];
         while (!analyzed_rows[col])
             continue;
-        uint col_lvl = row_levels[col];
+        int col_lvl = row_levels[col];
         if (row_lvl <= col_lvl)
             row_lvl = col_lvl + 1;
     }
@@ -32,21 +32,21 @@ extern "C" __global__ void analysis_lower(uint n_rows, uint *max_lvl, volatile b
         row_idx = 0;
 }
 
-extern "C" __global__ void analysis_upper(uint n_rows, uint *max_lvl, volatile bool *analyzed_rows, volatile uint *row_levels, uint *rows, uint *cols) {
+extern "C" __global__ void analysis_upper(int n_rows, int *max_lvl, volatile bool *analyzed_rows, volatile int *row_levels, int *rows, int *cols) {
     int row = n_rows - 1 - atomicAdd(&row_idx, 1);
     if (row < 0)
         return;
 
-    uint row_start = rows[row];
-    uint row_end = rows[row + 1] - 1;
+    int row_start = rows[row];
+    int row_end = rows[row + 1] - 1;
 
-    uint col;
-    uint row_lvl = 0;
-    for (uint i=row_end; i>row_start; i--) {
+    int col;
+    int row_lvl = 0;
+    for (int i=row_end; i>row_start; i--) {
         col = cols[i];
         while (!analyzed_rows[col])
             continue;
-        uint col_lvl = row_levels[col];
+        int col_lvl = row_levels[col];
         if (row_lvl <= col_lvl)
             row_lvl = col_lvl + 1;
     }
@@ -63,10 +63,10 @@ extern "C" __global__ void analysis_upper(uint n_rows, uint *max_lvl, volatile b
 
 
 template<typename Float>
-__device__ void solve_lower(uint nrhs, uint nrows, uint *stack_id, uint *levels, volatile bool *solved_rows, uint* rows, uint* columns, Float* values, volatile Float* x) {
+__device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, volatile bool *solved_rows, int *rows, int *columns, Float *values, volatile Float *x) {
 
-    __shared__ uint lvl_idx;
-    __shared__ uint cols_cache[CACHE_SIZE];
+    __shared__ int lvl_idx;
+    __shared__ int cols_cache[CACHE_SIZE];
     __shared__ Float vals_cache[CACHE_SIZE];
 
     int thread_idx = threadIdx.x;
@@ -79,20 +79,20 @@ __device__ void solve_lower(uint nrhs, uint nrows, uint *stack_id, uint *levels,
     if (lvl_idx >= nrows)
         return;
 
-    uint row = levels[lvl_idx];
-    uint row_start = rows[row];
-    uint row_end = rows[row + 1] - 1;
+    int row = levels[lvl_idx];
+    int row_start = rows[row];
+    int row_end = rows[row + 1] - 1;
     Float diag_entry = values[row_end];
     Float r;
     if (thread_idx < nrhs)
         r = x[thread_idx * nrows + row];
-    uint col;
+    int col;
     Float val;
     for (int i=row_start; i<row_end; ++i) {
-        uint cache_idx = (i-row_start) % CACHE_SIZE;
+        int cache_idx = (i-row_start) % CACHE_SIZE;
         if (cache_idx == 0) {
             // Update the cache
-            if (i + thread_idx < (int)row_end) {
+            if (i + thread_idx < row_end) {
                 cols_cache[thread_idx] = columns[i + thread_idx];
                 vals_cache[thread_idx] = values[i + thread_idx];
             }
@@ -132,10 +132,10 @@ __device__ void solve_lower(uint nrhs, uint nrows, uint *stack_id, uint *levels,
 }
 
 template<typename Float>
-__device__ void solve_upper(uint nrhs, uint nrows, uint *stack_id, uint *levels, volatile bool *solved_rows, uint* rows, uint* columns, Float* values, volatile Float* x) {
+__device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, volatile bool *solved_rows, int *rows, int *columns, Float *values, volatile Float *x) {
 
-    __shared__ uint lvl_idx;
-    __shared__ uint cols_cache[CACHE_SIZE];
+    __shared__ int lvl_idx;
+    __shared__ int cols_cache[CACHE_SIZE];
     __shared__ Float vals_cache[CACHE_SIZE];
 
     int thread_idx = threadIdx.x;
@@ -147,20 +147,20 @@ __device__ void solve_upper(uint nrhs, uint nrows, uint *stack_id, uint *levels,
     if (lvl_idx >= nrows)
         return;
 
-    uint row = levels[lvl_idx];
-    uint row_start = rows[row];
-    uint row_end = rows[row + 1] - 1;
+    int row = levels[lvl_idx];
+    int row_start = rows[row];
+    int row_end = rows[row + 1] - 1;
     Float diag_entry = values[row_start];
     Float r;
     if (thread_idx < nrhs)
         r = x[thread_idx * nrows + row];
-    uint col;
+    int col;
     Float val;
     for (int i=row_end; i>row_start; --i) {
         int cache_idx = (row_end - i) % CACHE_SIZE;
         if (cache_idx == 0) {
             // Update the cache
-            if (i - thread_idx > (int)row_start) {
+            if (i - thread_idx > row_start) {
                 vals_cache[thread_idx] = values[i - thread_idx];
                 cols_cache[thread_idx] = columns[i - thread_idx];
             }
@@ -200,18 +200,18 @@ __device__ void solve_upper(uint nrhs, uint nrows, uint *stack_id, uint *levels,
     solved_rows[row] = true;
 }
 
-extern "C" __global__ void solve_lower_float(uint nrhs, uint nrows, uint *stack_id,  uint *levels, bool *solved_rows, uint *rows, uint *columns, float *values, float*x) {
+extern "C" __global__ void solve_lower_float(int nrhs, int nrows, int *stack_id,  int *levels, bool *solved_rows, int *rows, int *columns, float *values, float*x) {
     solve_lower<float>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
 }
 
-extern "C" __global__ void solve_lower_double(uint nrhs, uint nrows, uint *stack_id, uint *levels, bool *solved_rows, uint *rows, uint *columns, double *values, double*x) {
+extern "C" __global__ void solve_lower_double(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, double *values, double*x) {
     solve_lower<double>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
 }
 
-extern "C" __global__ void solve_upper_float(uint nrhs, uint nrows, uint *stack_id, uint *levels, bool *solved_rows, uint *rows, uint *columns, float *values, float*x) {
+extern "C" __global__ void solve_upper_float(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, float *values, float*x) {
     solve_upper<float>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
 }
 
-extern "C" __global__ void solve_upper_double(uint nrhs, uint nrows, uint *stack_id, uint *levels, bool *solved_rows, uint *rows, uint *columns, double *values, double*x) {
+extern "C" __global__ void solve_upper_double(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, double *values, double*x) {
     solve_upper<double>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
 }

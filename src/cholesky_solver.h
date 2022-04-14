@@ -7,7 +7,7 @@
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(uint nrhs, uint n_verts, uint n_faces, uint* faces, double lambda);
+    CholeskySolver(int nrhs, int n_verts, int n_faces, int *faces, double lambda);
 
     ~CholeskySolver();
 
@@ -17,20 +17,20 @@ public:
 private:
 
     // Build the (I+λL) matrix in CSC representation
-    void build_matrix(uint n_verts, uint n_faces, uint *faces, double lambda, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data);
+    void build_matrix(int n_verts, int n_faces, int *faces, double lambda, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data);
 
     // Factorize the CSC matrix using CHOLMOD
     void factorize(std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data);
 
     // Run the analysis of a triangular matrix obtained through Cholesky
-    void analyze(uint n_rows, uint n_entries, void *csr_rows, void *csr_cols, Float* csr_data, bool lower);
+    void analyze(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);
 
 	// Solve one triangular system
     void solve(bool lower);
 
-    uint m_nrhs;
-    uint m_n;
-    uint *m_perm;
+    int m_nrhs;
+    int m_n;
+    int *m_perm;
 
     // CSR Lower triangular
     CUdeviceptr m_lower_rows_d;
