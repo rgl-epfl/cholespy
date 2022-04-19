@@ -85,7 +85,7 @@ __device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, vol
     Float diag_entry = values[row_end];
     Float r;
     if (thread_idx < nrhs)
-        r = x[thread_idx * nrows + row];
+        r = x[row * nrhs + thread_idx];
     int col;
     Float val;
     for (int i=row_start; i<row_end; ++i) {
@@ -112,13 +112,13 @@ __device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, vol
         __syncthreads();
 
         if (thread_idx < nrhs)
-            r -= val * x[thread_idx * nrows + col];
+            r -= val * x[col * nrhs + thread_idx];
 
     }
 
     // Write the final value
     if (thread_idx < nrhs)
-        x[thread_idx * nrows + row] = r / diag_entry;
+        x[row * nrhs + thread_idx] = r / diag_entry;
 
     // Make sure we write all entries before signaling other blocks
     __threadfence();
@@ -153,7 +153,7 @@ __device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, vol
     Float diag_entry = values[row_start];
     Float r;
     if (thread_idx < nrhs)
-        r = x[thread_idx * nrows + row];
+        r = x[row * nrhs + thread_idx];
     int col;
     Float val;
     for (int i=row_end; i>row_start; --i) {
@@ -180,13 +180,13 @@ __device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, vol
         __syncthreads();
 
         if (thread_idx < nrhs)
-            r -= val * x[thread_idx * nrows + col];
+            r -= val * x[col * nrhs + thread_idx];
 
     }
 
     // Write the final value
     if (thread_idx < nrhs)
-        x[thread_idx * nrows + row] = r / diag_entry;
+        x[row * nrhs + thread_idx] = r / diag_entry;
 
 
     // Make sure we write all entries before signaling other blocks

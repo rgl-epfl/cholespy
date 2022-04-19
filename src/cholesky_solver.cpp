@@ -385,14 +385,15 @@ void CholeskySolver<Float>::solve(bool lower) {
 }
 
 template <typename Float>
-std::vector<Float> CholeskySolver<Float>::solve(Float *b) {
+Float *CholeskySolver<Float>::solve(Float *b) {
     // TODO fallback to cholmod in the CPU array case
     // TODO: Do this on the GPU?
     Float *tmp = (Float *)malloc(m_n * m_nrhs * sizeof(Float));
-    for (int i=0; i<m_n; ++i)
+    for (int i=0; i<m_n; ++i) {
         for (int j=0; j<m_nrhs; ++j) {
-            tmp[m_n * j + i] = b[m_n * j + m_perm[i]];
+            tmp[i*m_nrhs + j] = b[m_perm[i]*m_nrhs + j];
         }
+    }
 
     cuda_check(cuMemcpyHtoDAsync(m_x_d, tmp, m_n*m_nrhs*sizeof(Float), 0));
 
@@ -401,11 +402,12 @@ std::vector<Float> CholeskySolver<Float>::solve(Float *b) {
 
     cuda_check(cuMemcpyDtoHAsync(tmp, m_x_d, m_n*m_nrhs*sizeof(Float), 0));
 
-	std::vector<Float> sol(m_n*m_nrhs);
+    Float *sol = (Float *)malloc(m_n * m_nrhs * sizeof(Float));//TODO: this is destroyed on the python side, could be done better
     // Invert permutation
-    for (int i=0; i<m_n; ++i)
+    for (int i=0; i<m_n; ++i) {
         for (int j=0; j<m_nrhs; ++j)
-            sol[m_n * j + m_perm[i]] = tmp[m_n * j + i];
+            sol[m_perm[i]*m_nrhs + j] = tmp[i*m_nrhs + j];
+    }
 
     free(tmp);
     return sol;

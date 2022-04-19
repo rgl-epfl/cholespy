@@ -216,19 +216,19 @@ BB1_7:
 
 	ld.param.u32 	%r12, [solve_lower_float_param_0];
 	ld.param.u32 	%r13, [solve_lower_float_param_1];
-	ld.param.u64 	%rd3, [solve_lower_float_param_2];
-	ld.param.u64 	%rd4, [solve_lower_float_param_3];
-	ld.param.u64 	%rd5, [solve_lower_float_param_4];
-	ld.param.u64 	%rd6, [solve_lower_float_param_5];
-	ld.param.u64 	%rd7, [solve_lower_float_param_6];
-	ld.param.u64 	%rd8, [solve_lower_float_param_7];
-	ld.param.u64 	%rd9, [solve_lower_float_param_8];
+	ld.param.u64 	%rd2, [solve_lower_float_param_2];
+	ld.param.u64 	%rd3, [solve_lower_float_param_3];
+	ld.param.u64 	%rd4, [solve_lower_float_param_4];
+	ld.param.u64 	%rd5, [solve_lower_float_param_5];
+	ld.param.u64 	%rd6, [solve_lower_float_param_6];
+	ld.param.u64 	%rd7, [solve_lower_float_param_7];
+	ld.param.u64 	%rd8, [solve_lower_float_param_8];
 	mov.u32 	%r1, %tid.x;
 	setp.ne.s32	%p3, %r1, 0;
 	@%p3 bra 	BB2_2;
 
-	cvta.to.global.u64 	%rd10, %rd3;
-	atom.global.add.u32 	%r14, [%rd10], 1;
+	cvta.to.global.u64 	%rd9, %rd2;
+	atom.global.add.u32 	%r14, [%rd9], 1;
 	st.shared.u32 	[_ZZ11solve_lowerIfEviiPiS0_PVbS0_S0_PT_PVS3_E7lvl_idx], %r14;
 
 BB2_2:
@@ -237,34 +237,34 @@ BB2_2:
 	setp.ge.s32	%p4, %r2, %r13;
 	@%p4 bra 	BB2_23;
 
-	cvta.to.global.u64 	%rd1, %rd9;
-	cvta.to.global.u64 	%rd11, %rd8;
-	cvta.to.global.u64 	%rd12, %rd6;
-	cvta.to.global.u64 	%rd13, %rd4;
-	mul.wide.s32 	%rd14, %r2, 4;
-	add.s64 	%rd15, %rd13, %rd14;
-	ld.global.u32 	%r3, [%rd15];
-	mul.wide.s32 	%rd16, %r3, 4;
-	add.s64 	%rd17, %rd12, %rd16;
-	ld.global.u32 	%r4, [%rd17];
-	ld.global.u32 	%r15, [%rd17+4];
+	cvta.to.global.u64 	%rd10, %rd7;
+	cvta.to.global.u64 	%rd11, %rd5;
+	cvta.to.global.u64 	%rd12, %rd3;
+	mul.wide.s32 	%rd13, %r2, 4;
+	add.s64 	%rd14, %rd12, %rd13;
+	ld.global.u32 	%r3, [%rd14];
+	mul.wide.s32 	%rd15, %r3, 4;
+	add.s64 	%rd16, %rd11, %rd15;
+	ld.global.u32 	%r4, [%rd16];
+	ld.global.u32 	%r15, [%rd16+4];
 	add.s32 	%r5, %r15, -1;
-	mul.wide.s32 	%rd18, %r5, 4;
-	add.s64 	%rd19, %rd11, %rd18;
-	ld.global.f32 	%f1, [%rd19];
+	mul.wide.s32 	%rd17, %r5, 4;
+	add.s64 	%rd18, %rd10, %rd17;
+	ld.global.f32 	%f1, [%rd18];
 	setp.ge.s32	%p5, %r1, %r12;
 	@%p5 bra 	BB2_5;
 
-	mad.lo.s32 	%r17, %r1, %r13, %r3;
+	cvta.to.global.u64 	%rd19, %rd8;
+	mad.lo.s32 	%r17, %r3, %r12, %r1;
 	mul.wide.s32 	%rd20, %r17, 4;
-	add.s64 	%rd21, %rd1, %rd20;
+	add.s64 	%rd21, %rd19, %rd20;
 	ld.volatile.global.f32 	%f19, [%rd21];
 
 BB2_5:
 	setp.ge.s32	%p6, %r4, %r5;
 	@%p6 bra 	BB2_19;
 
-	cvta.to.global.u64 	%rd22, %rd7;
+	cvta.to.global.u64 	%rd22, %rd6;
 	mov.u32 	%r48, %r4;
 
 BB2_7:
@@ -288,7 +288,7 @@ BB2_7:
 	mov.u32 	%r30, _ZZ11solve_lowerIfEviiPiS0_PVbS0_S0_PT_PVS3_E10cols_cache;
 	add.s32 	%r31, %r30, %r29;
 	st.shared.u32 	[%r31], %r28;
-	add.s64 	%rd26, %rd11, %rd23;
+	add.s64 	%rd26, %rd10, %rd23;
 	ld.global.f32 	%f13, [%rd26];
 	mov.u32 	%r32, _ZZ11solve_lowerIfEviiPiS0_PVbS0_S0_PT_PVS3_E10vals_cache;
 	add.s32 	%r33, %r32, %r29;
@@ -311,12 +311,12 @@ BB2_11:
 BB2_13:
 	@%p3 bra 	BB2_16;
 
-	cvta.to.global.u64 	%rd27, %rd5;
+	cvta.to.global.u64 	%rd27, %rd4;
 	cvt.s64.s32	%rd28, %r50;
-	add.s64 	%rd2, %rd27, %rd28;
+	add.s64 	%rd1, %rd27, %rd28;
 
 BB2_15:
-	ld.volatile.global.u8 	%rs1, [%rd2];
+	ld.volatile.global.u8 	%rs1, [%rd1];
 	setp.eq.s16	%p11, %rs1, 0;
 	@%p11 bra 	BB2_15;
 
@@ -327,9 +327,10 @@ BB2_16:
 	bra.uni 	BB2_17;
 
 BB2_17:
-	mad.lo.s32 	%r43, %r1, %r13, %r50;
+	mad.lo.s32 	%r43, %r50, %r12, %r1;
+	cvta.to.global.u64 	%rd29, %rd8;
 	mul.wide.s32 	%rd30, %r43, 4;
-	add.s64 	%rd31, %rd1, %rd30;
+	add.s64 	%rd31, %rd29, %rd30;
 	ld.volatile.global.f32 	%f14, [%rd31];
 	mul.f32 	%f15, %f20, %f14;
 	sub.f32 	%f19, %f19, %f15;
@@ -343,9 +344,10 @@ BB2_19:
 	@%p5 bra 	BB2_21;
 
 	div.rn.f32 	%f16, %f19, %f1;
-	mad.lo.s32 	%r46, %r1, %r13, %r3;
+	mad.lo.s32 	%r46, %r3, %r12, %r1;
+	cvta.to.global.u64 	%rd32, %rd8;
 	mul.wide.s32 	%rd33, %r46, 4;
-	add.s64 	%rd34, %rd1, %rd33;
+	add.s64 	%rd34, %rd32, %rd33;
 	st.volatile.global.f32 	[%rd34], %f16;
 
 BB2_21:
@@ -356,7 +358,7 @@ BB2_21:
 	bra.uni 	BB2_22;
 
 BB2_22:
-	cvta.to.global.u64 	%rd35, %rd5;
+	cvta.to.global.u64 	%rd35, %rd4;
 	cvt.s64.s32	%rd36, %r3;
 	add.s64 	%rd37, %rd35, %rd36;
 	mov.u16 	%rs2, 1;
@@ -393,19 +395,19 @@ BB2_23:
 
 	ld.param.u32 	%r12, [solve_lower_double_param_0];
 	ld.param.u32 	%r13, [solve_lower_double_param_1];
-	ld.param.u64 	%rd3, [solve_lower_double_param_2];
-	ld.param.u64 	%rd4, [solve_lower_double_param_3];
-	ld.param.u64 	%rd5, [solve_lower_double_param_4];
-	ld.param.u64 	%rd6, [solve_lower_double_param_5];
-	ld.param.u64 	%rd7, [solve_lower_double_param_6];
-	ld.param.u64 	%rd8, [solve_lower_double_param_7];
-	ld.param.u64 	%rd9, [solve_lower_double_param_8];
+	ld.param.u64 	%rd2, [solve_lower_double_param_2];
+	ld.param.u64 	%rd3, [solve_lower_double_param_3];
+	ld.param.u64 	%rd4, [solve_lower_double_param_4];
+	ld.param.u64 	%rd5, [solve_lower_double_param_5];
+	ld.param.u64 	%rd6, [solve_lower_double_param_6];
+	ld.param.u64 	%rd7, [solve_lower_double_param_7];
+	ld.param.u64 	%rd8, [solve_lower_double_param_8];
 	mov.u32 	%r1, %tid.x;
 	setp.ne.s32	%p3, %r1, 0;
 	@%p3 bra 	BB3_2;
 
-	cvta.to.global.u64 	%rd10, %rd3;
-	atom.global.add.u32 	%r14, [%rd10], 1;
+	cvta.to.global.u64 	%rd9, %rd2;
+	atom.global.add.u32 	%r14, [%rd9], 1;
 	st.shared.u32 	[_ZZ11solve_lowerIdEviiPiS0_PVbS0_S0_PT_PVS3_E7lvl_idx], %r14;
 
 BB3_2:
@@ -414,34 +416,34 @@ BB3_2:
 	setp.ge.s32	%p4, %r2, %r13;
 	@%p4 bra 	BB3_23;
 
-	cvta.to.global.u64 	%rd1, %rd9;
-	cvta.to.global.u64 	%rd11, %rd8;
-	cvta.to.global.u64 	%rd12, %rd6;
-	cvta.to.global.u64 	%rd13, %rd4;
-	mul.wide.s32 	%rd14, %r2, 4;
-	add.s64 	%rd15, %rd13, %rd14;
-	ld.global.u32 	%r3, [%rd15];
-	mul.wide.s32 	%rd16, %r3, 4;
-	add.s64 	%rd17, %rd12, %rd16;
-	ld.global.u32 	%r4, [%rd17];
-	ld.global.u32 	%r15, [%rd17+4];
+	cvta.to.global.u64 	%rd10, %rd7;
+	cvta.to.global.u64 	%rd11, %rd5;
+	cvta.to.global.u64 	%rd12, %rd3;
+	mul.wide.s32 	%rd13, %r2, 4;
+	add.s64 	%rd14, %rd12, %rd13;
+	ld.global.u32 	%r3, [%rd14];
+	mul.wide.s32 	%rd15, %r3, 4;
+	add.s64 	%rd16, %rd11, %rd15;
+	ld.global.u32 	%r4, [%rd16];
+	ld.global.u32 	%r15, [%rd16+4];
 	add.s32 	%r5, %r15, -1;
-	mul.wide.s32 	%rd18, %r5, 8;
-	add.s64 	%rd19, %rd11, %rd18;
-	ld.global.f64 	%fd1, [%rd19];
+	mul.wide.s32 	%rd17, %r5, 8;
+	add.s64 	%rd18, %rd10, %rd17;
+	ld.global.f64 	%fd1, [%rd18];
 	setp.ge.s32	%p5, %r1, %r12;
 	@%p5 bra 	BB3_5;
 
-	mad.lo.s32 	%r17, %r1, %r13, %r3;
+	cvta.to.global.u64 	%rd19, %rd8;
+	mad.lo.s32 	%r17, %r3, %r12, %r1;
 	mul.wide.s32 	%rd20, %r17, 8;
-	add.s64 	%rd21, %rd1, %rd20;
+	add.s64 	%rd21, %rd19, %rd20;
 	ld.volatile.global.f64 	%fd19, [%rd21];
 
 BB3_5:
 	setp.ge.s32	%p6, %r4, %r5;
 	@%p6 bra 	BB3_19;
 
-	cvta.to.global.u64 	%rd22, %rd7;
+	cvta.to.global.u64 	%rd22, %rd6;
 	mov.u32 	%r50, %r4;
 
 BB3_7:
@@ -466,7 +468,7 @@ BB3_7:
 	add.s32 	%r31, %r30, %r29;
 	st.shared.u32 	[%r31], %r28;
 	mul.wide.s32 	%rd26, %r25, 8;
-	add.s64 	%rd27, %rd11, %rd26;
+	add.s64 	%rd27, %rd10, %rd26;
 	ld.global.f64 	%fd13, [%rd27];
 	shl.b32 	%r32, %r1, 3;
 	mov.u32 	%r33, _ZZ11solve_lowerIdEviiPiS0_PVbS0_S0_PT_PVS3_E10vals_cache;
@@ -491,12 +493,12 @@ BB3_11:
 BB3_13:
 	@%p3 bra 	BB3_16;
 
-	cvta.to.global.u64 	%rd28, %rd5;
+	cvta.to.global.u64 	%rd28, %rd4;
 	cvt.s64.s32	%rd29, %r52;
-	add.s64 	%rd2, %rd28, %rd29;
+	add.s64 	%rd1, %rd28, %rd29;
 
 BB3_15:
-	ld.volatile.global.u8 	%rs1, [%rd2];
+	ld.volatile.global.u8 	%rs1, [%rd1];
 	setp.eq.s16	%p11, %rs1, 0;
 	@%p11 bra 	BB3_15;
 
@@ -507,9 +509,10 @@ BB3_16:
 	bra.uni 	BB3_17;
 
 BB3_17:
-	mad.lo.s32 	%r45, %r1, %r13, %r52;
+	mad.lo.s32 	%r45, %r52, %r12, %r1;
+	cvta.to.global.u64 	%rd30, %rd8;
 	mul.wide.s32 	%rd31, %r45, 8;
-	add.s64 	%rd32, %rd1, %rd31;
+	add.s64 	%rd32, %rd30, %rd31;
 	ld.volatile.global.f64 	%fd14, [%rd32];
 	mul.f64 	%fd15, %fd20, %fd14;
 	sub.f64 	%fd19, %fd19, %fd15;
@@ -523,9 +526,10 @@ BB3_19:
 	@%p5 bra 	BB3_21;
 
 	div.rn.f64 	%fd16, %fd19, %fd1;
-	mad.lo.s32 	%r48, %r1, %r13, %r3;
+	mad.lo.s32 	%r48, %r3, %r12, %r1;
+	cvta.to.global.u64 	%rd33, %rd8;
 	mul.wide.s32 	%rd34, %r48, 8;
-	add.s64 	%rd35, %rd1, %rd34;
+	add.s64 	%rd35, %rd33, %rd34;
 	st.volatile.global.f64 	[%rd35], %fd16;
 
 BB3_21:
@@ -536,7 +540,7 @@ BB3_21:
 	bra.uni 	BB3_22;
 
 BB3_22:
-	cvta.to.global.u64 	%rd36, %rd5;
+	cvta.to.global.u64 	%rd36, %rd4;
 	cvt.s64.s32	%rd37, %r3;
 	add.s64 	%rd38, %rd36, %rd37;
 	mov.u16 	%rs2, 1;
@@ -573,19 +577,19 @@ BB3_23:
 
 	ld.param.u32 	%r12, [solve_upper_float_param_0];
 	ld.param.u32 	%r13, [solve_upper_float_param_1];
-	ld.param.u64 	%rd3, [solve_upper_float_param_2];
-	ld.param.u64 	%rd4, [solve_upper_float_param_3];
-	ld.param.u64 	%rd5, [solve_upper_float_param_4];
-	ld.param.u64 	%rd6, [solve_upper_float_param_5];
-	ld.param.u64 	%rd7, [solve_upper_float_param_6];
-	ld.param.u64 	%rd8, [solve_upper_float_param_7];
-	ld.param.u64 	%rd9, [solve_upper_float_param_8];
+	ld.param.u64 	%rd2, [solve_upper_float_param_2];
+	ld.param.u64 	%rd3, [solve_upper_float_param_3];
+	ld.param.u64 	%rd4, [solve_upper_float_param_4];
+	ld.param.u64 	%rd5, [solve_upper_float_param_5];
+	ld.param.u64 	%rd6, [solve_upper_float_param_6];
+	ld.param.u64 	%rd7, [solve_upper_float_param_7];
+	ld.param.u64 	%rd8, [solve_upper_float_param_8];
 	mov.u32 	%r1, %tid.x;
 	setp.ne.s32	%p3, %r1, 0;
 	@%p3 bra 	BB4_2;
 
-	cvta.to.global.u64 	%rd10, %rd3;
-	atom.global.add.u32 	%r14, [%rd10], 1;
+	cvta.to.global.u64 	%rd9, %rd2;
+	atom.global.add.u32 	%r14, [%rd9], 1;
 	st.shared.u32 	[_ZZ11solve_upperIfEviiPiS0_PVbS0_S0_PT_PVS3_E7lvl_idx], %r14;
 
 BB4_2:
@@ -594,34 +598,34 @@ BB4_2:
 	setp.ge.s32	%p4, %r2, %r13;
 	@%p4 bra 	BB4_23;
 
-	cvta.to.global.u64 	%rd1, %rd9;
-	cvta.to.global.u64 	%rd11, %rd8;
-	cvta.to.global.u64 	%rd12, %rd6;
-	cvta.to.global.u64 	%rd13, %rd4;
-	mul.wide.s32 	%rd14, %r2, 4;
-	add.s64 	%rd15, %rd13, %rd14;
-	ld.global.u32 	%r3, [%rd15];
-	mul.wide.s32 	%rd16, %r3, 4;
-	add.s64 	%rd17, %rd12, %rd16;
-	ld.global.u32 	%r15, [%rd17+4];
+	cvta.to.global.u64 	%rd10, %rd7;
+	cvta.to.global.u64 	%rd11, %rd5;
+	cvta.to.global.u64 	%rd12, %rd3;
+	mul.wide.s32 	%rd13, %r2, 4;
+	add.s64 	%rd14, %rd12, %rd13;
+	ld.global.u32 	%r3, [%rd14];
+	mul.wide.s32 	%rd15, %r3, 4;
+	add.s64 	%rd16, %rd11, %rd15;
+	ld.global.u32 	%r15, [%rd16+4];
 	add.s32 	%r4, %r15, -1;
-	ld.global.u32 	%r5, [%rd17];
-	mul.wide.s32 	%rd18, %r5, 4;
-	add.s64 	%rd19, %rd11, %rd18;
-	ld.global.f32 	%f1, [%rd19];
+	ld.global.u32 	%r5, [%rd16];
+	mul.wide.s32 	%rd17, %r5, 4;
+	add.s64 	%rd18, %rd10, %rd17;
+	ld.global.f32 	%f1, [%rd18];
 	setp.ge.s32	%p5, %r1, %r12;
 	@%p5 bra 	BB4_5;
 
-	mad.lo.s32 	%r17, %r1, %r13, %r3;
+	cvta.to.global.u64 	%rd19, %rd8;
+	mad.lo.s32 	%r17, %r3, %r12, %r1;
 	mul.wide.s32 	%rd20, %r17, 4;
-	add.s64 	%rd21, %rd1, %rd20;
+	add.s64 	%rd21, %rd19, %rd20;
 	ld.volatile.global.f32 	%f19, [%rd21];
 
 BB4_5:
 	setp.le.s32	%p6, %r4, %r5;
 	@%p6 bra 	BB4_19;
 
-	cvta.to.global.u64 	%rd25, %rd7;
+	cvta.to.global.u64 	%rd25, %rd6;
 	mov.u32 	%r48, %r4;
 
 BB4_7:
@@ -639,7 +643,7 @@ BB4_7:
 	@%p8 bra 	BB4_10;
 
 	mul.wide.s32 	%rd23, %r25, 4;
-	add.s64 	%rd24, %rd11, %rd23;
+	add.s64 	%rd24, %rd10, %rd23;
 	ld.global.f32 	%f13, [%rd24];
 	shl.b32 	%r28, %r1, 2;
 	mov.u32 	%r29, _ZZ11solve_upperIfEviiPiS0_PVbS0_S0_PT_PVS3_E10vals_cache;
@@ -668,12 +672,12 @@ BB4_11:
 BB4_13:
 	@%p3 bra 	BB4_16;
 
-	cvta.to.global.u64 	%rd27, %rd5;
+	cvta.to.global.u64 	%rd27, %rd4;
 	cvt.s64.s32	%rd28, %r50;
-	add.s64 	%rd2, %rd27, %rd28;
+	add.s64 	%rd1, %rd27, %rd28;
 
 BB4_15:
-	ld.volatile.global.u8 	%rs1, [%rd2];
+	ld.volatile.global.u8 	%rs1, [%rd1];
 	setp.eq.s16	%p11, %rs1, 0;
 	@%p11 bra 	BB4_15;
 
@@ -684,9 +688,10 @@ BB4_16:
 	bra.uni 	BB4_17;
 
 BB4_17:
-	mad.lo.s32 	%r43, %r1, %r13, %r50;
+	mad.lo.s32 	%r43, %r50, %r12, %r1;
+	cvta.to.global.u64 	%rd29, %rd8;
 	mul.wide.s32 	%rd30, %r43, 4;
-	add.s64 	%rd31, %rd1, %rd30;
+	add.s64 	%rd31, %rd29, %rd30;
 	ld.volatile.global.f32 	%f14, [%rd31];
 	mul.f32 	%f15, %f20, %f14;
 	sub.f32 	%f19, %f19, %f15;
@@ -700,9 +705,10 @@ BB4_19:
 	@%p5 bra 	BB4_21;
 
 	div.rn.f32 	%f16, %f19, %f1;
-	mad.lo.s32 	%r46, %r1, %r13, %r3;
+	mad.lo.s32 	%r46, %r3, %r12, %r1;
+	cvta.to.global.u64 	%rd32, %rd8;
 	mul.wide.s32 	%rd33, %r46, 4;
-	add.s64 	%rd34, %rd1, %rd33;
+	add.s64 	%rd34, %rd32, %rd33;
 	st.volatile.global.f32 	[%rd34], %f16;
 
 BB4_21:
@@ -713,7 +719,7 @@ BB4_21:
 	bra.uni 	BB4_22;
 
 BB4_22:
-	cvta.to.global.u64 	%rd35, %rd5;
+	cvta.to.global.u64 	%rd35, %rd4;
 	cvt.s64.s32	%rd36, %r3;
 	add.s64 	%rd37, %rd35, %rd36;
 	mov.u16 	%rs2, 1;
@@ -750,19 +756,19 @@ BB4_23:
 
 	ld.param.u32 	%r12, [solve_upper_double_param_0];
 	ld.param.u32 	%r13, [solve_upper_double_param_1];
-	ld.param.u64 	%rd3, [solve_upper_double_param_2];
-	ld.param.u64 	%rd4, [solve_upper_double_param_3];
-	ld.param.u64 	%rd5, [solve_upper_double_param_4];
-	ld.param.u64 	%rd6, [solve_upper_double_param_5];
-	ld.param.u64 	%rd7, [solve_upper_double_param_6];
-	ld.param.u64 	%rd8, [solve_upper_double_param_7];
-	ld.param.u64 	%rd9, [solve_upper_double_param_8];
+	ld.param.u64 	%rd2, [solve_upper_double_param_2];
+	ld.param.u64 	%rd3, [solve_upper_double_param_3];
+	ld.param.u64 	%rd4, [solve_upper_double_param_4];
+	ld.param.u64 	%rd5, [solve_upper_double_param_5];
+	ld.param.u64 	%rd6, [solve_upper_double_param_6];
+	ld.param.u64 	%rd7, [solve_upper_double_param_7];
+	ld.param.u64 	%rd8, [solve_upper_double_param_8];
 	mov.u32 	%r1, %tid.x;
 	setp.ne.s32	%p3, %r1, 0;
 	@%p3 bra 	BB5_2;
 
-	cvta.to.global.u64 	%rd10, %rd3;
-	atom.global.add.u32 	%r14, [%rd10], 1;
+	cvta.to.global.u64 	%rd9, %rd2;
+	atom.global.add.u32 	%r14, [%rd9], 1;
 	st.shared.u32 	[_ZZ11solve_upperIdEviiPiS0_PVbS0_S0_PT_PVS3_E7lvl_idx], %r14;
 
 BB5_2:
@@ -771,34 +777,34 @@ BB5_2:
 	setp.ge.s32	%p4, %r2, %r13;
 	@%p4 bra 	BB5_23;
 
-	cvta.to.global.u64 	%rd1, %rd9;
-	cvta.to.global.u64 	%rd11, %rd8;
-	cvta.to.global.u64 	%rd12, %rd6;
-	cvta.to.global.u64 	%rd13, %rd4;
-	mul.wide.s32 	%rd14, %r2, 4;
-	add.s64 	%rd15, %rd13, %rd14;
-	ld.global.u32 	%r3, [%rd15];
-	mul.wide.s32 	%rd16, %r3, 4;
-	add.s64 	%rd17, %rd12, %rd16;
-	ld.global.u32 	%r15, [%rd17+4];
+	cvta.to.global.u64 	%rd10, %rd7;
+	cvta.to.global.u64 	%rd11, %rd5;
+	cvta.to.global.u64 	%rd12, %rd3;
+	mul.wide.s32 	%rd13, %r2, 4;
+	add.s64 	%rd14, %rd12, %rd13;
+	ld.global.u32 	%r3, [%rd14];
+	mul.wide.s32 	%rd15, %r3, 4;
+	add.s64 	%rd16, %rd11, %rd15;
+	ld.global.u32 	%r15, [%rd16+4];
 	add.s32 	%r4, %r15, -1;
-	ld.global.u32 	%r5, [%rd17];
-	mul.wide.s32 	%rd18, %r5, 8;
-	add.s64 	%rd19, %rd11, %rd18;
-	ld.global.f64 	%fd1, [%rd19];
+	ld.global.u32 	%r5, [%rd16];
+	mul.wide.s32 	%rd17, %r5, 8;
+	add.s64 	%rd18, %rd10, %rd17;
+	ld.global.f64 	%fd1, [%rd18];
 	setp.ge.s32	%p5, %r1, %r12;
 	@%p5 bra 	BB5_5;
 
-	mad.lo.s32 	%r17, %r1, %r13, %r3;
+	cvta.to.global.u64 	%rd19, %rd8;
+	mad.lo.s32 	%r17, %r3, %r12, %r1;
 	mul.wide.s32 	%rd20, %r17, 8;
-	add.s64 	%rd21, %rd1, %rd20;
+	add.s64 	%rd21, %rd19, %rd20;
 	ld.volatile.global.f64 	%fd19, [%rd21];
 
 BB5_5:
 	setp.le.s32	%p6, %r4, %r5;
 	@%p6 bra 	BB5_19;
 
-	cvta.to.global.u64 	%rd25, %rd7;
+	cvta.to.global.u64 	%rd25, %rd6;
 	mov.u32 	%r50, %r4;
 
 BB5_7:
@@ -816,7 +822,7 @@ BB5_7:
 	@%p8 bra 	BB5_10;
 
 	mul.wide.s32 	%rd23, %r25, 8;
-	add.s64 	%rd24, %rd11, %rd23;
+	add.s64 	%rd24, %rd10, %rd23;
 	ld.global.f64 	%fd13, [%rd24];
 	shl.b32 	%r28, %r1, 3;
 	mov.u32 	%r29, _ZZ11solve_upperIdEviiPiS0_PVbS0_S0_PT_PVS3_E10vals_cache;
@@ -848,12 +854,12 @@ BB5_11:
 BB5_13:
 	@%p3 bra 	BB5_16;
 
-	cvta.to.global.u64 	%rd28, %rd5;
+	cvta.to.global.u64 	%rd28, %rd4;
 	cvt.s64.s32	%rd29, %r52;
-	add.s64 	%rd2, %rd28, %rd29;
+	add.s64 	%rd1, %rd28, %rd29;
 
 BB5_15:
-	ld.volatile.global.u8 	%rs1, [%rd2];
+	ld.volatile.global.u8 	%rs1, [%rd1];
 	setp.eq.s16	%p11, %rs1, 0;
 	@%p11 bra 	BB5_15;
 
@@ -864,9 +870,10 @@ BB5_16:
 	bra.uni 	BB5_17;
 
 BB5_17:
-	mad.lo.s32 	%r45, %r1, %r13, %r52;
+	mad.lo.s32 	%r45, %r52, %r12, %r1;
+	cvta.to.global.u64 	%rd30, %rd8;
 	mul.wide.s32 	%rd31, %r45, 8;
-	add.s64 	%rd32, %rd1, %rd31;
+	add.s64 	%rd32, %rd30, %rd31;
 	ld.volatile.global.f64 	%fd14, [%rd32];
 	mul.f64 	%fd15, %fd20, %fd14;
 	sub.f64 	%fd19, %fd19, %fd15;
@@ -880,9 +887,10 @@ BB5_19:
 	@%p5 bra 	BB5_21;
 
 	div.rn.f64 	%fd16, %fd19, %fd1;
-	mad.lo.s32 	%r48, %r1, %r13, %r3;
+	mad.lo.s32 	%r48, %r3, %r12, %r1;
+	cvta.to.global.u64 	%rd33, %rd8;
 	mul.wide.s32 	%rd34, %r48, 8;
-	add.s64 	%rd35, %rd1, %rd34;
+	add.s64 	%rd35, %rd33, %rd34;
 	st.volatile.global.f64 	[%rd35], %fd16;
 
 BB5_21:
@@ -893,7 +901,7 @@ BB5_21:
 	bra.uni 	BB5_22;
 
 BB5_22:
-	cvta.to.global.u64 	%rd36, %rd5;
+	cvta.to.global.u64 	%rd36, %rd4;
 	cvt.s64.s32	%rd37, %r3;
 	add.s64 	%rd38, %rd36, %rd37;
 	mov.u16 	%rs2, 1;

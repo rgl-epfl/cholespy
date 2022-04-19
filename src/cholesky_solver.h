@@ -12,7 +12,7 @@ public:
     ~CholeskySolver();
 
     // Solve the whole system using the Cholesky factorization
-    std::vector<Float> solve(Float *b);
+    Float *solve(Float *b);
 
 private:
 

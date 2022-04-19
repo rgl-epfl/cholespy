@@ -1,6 +1,5 @@
 import pytest
 from cholesky import CholeskySolverD, CholeskySolverF
-from drjit.llvm import Int, Float32, Float64
 import numpy as np
 import sksparse.cholmod as cholmod
 import scipy.sparse as sp
@@ -30,28 +29,38 @@ def test_cube_float():
     n_faces = 12
     lambda_ = 2.0
 
-    faces_numpy = np.array([0, 1, 3, 0, 3, 2, 2, 3, 7, 2, 7, 6, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4, 1, 5, 7, 1, 7, 3, 0, 4, 6, 0, 6, 2])
-    faces = Int(faces_numpy)
+    faces = np.array([[0, 1, 3],
+                     [0, 3, 2],
+                     [2, 3, 7],
+                     [2, 7, 6],
+                     [4, 5, 7],
+                     [4, 7, 6],
+                     [0, 1, 5],
+                     [0, 5, 4],
+                     [1, 5, 7],
+                     [1, 7, 3],
+                     [0, 4, 6],
+                     [0, 6, 2]])
 
-    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
+    L_sp = build_matrix(n_verts, faces, lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     # Test with a single RHS
-    solver = CholeskySolverF(1, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverF(1, n_verts, n_faces, faces, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_verts)
+    b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
-    assert(np.allclose(solver.solve(Float32(b).data_()), factor.solve_A(b)))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
     n_rhs = 32
-    solver = CholeskySolverF(n_rhs, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverF(n_rhs, n_verts, n_faces, faces, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_rhs*n_verts)
-    sol = solver.solve(Float32(b.flatten()).data_())
-    sol_ref = factor.solve_A(b.reshape((n_rhs, n_verts)).T).T.flatten()
+    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float32).T
+    sol = solver.solve(b)
+    sol_ref = factor.solve_A(b)
 
     assert(np.allclose(sol, sol_ref))
 
@@ -60,28 +69,38 @@ def test_cube_double():
     n_faces = 12
     lambda_ = 2.0
 
-    faces_numpy = np.array([0, 1, 3, 0, 3, 2, 2, 3, 7, 2, 7, 6, 4, 5, 7, 4, 7, 6, 0, 1, 5, 0, 5, 4, 1, 5, 7, 1, 7, 3, 0, 4, 6, 0, 6, 2])
-    faces = Int(faces_numpy)
+    faces = np.array([[0, 1, 3],
+                     [0, 3, 2],
+                     [2, 3, 7],
+                     [2, 7, 6],
+                     [4, 5, 7],
+                     [4, 7, 6],
+                     [0, 1, 5],
+                     [0, 5, 4],
+                     [1, 5, 7],
+                     [1, 7, 3],
+                     [0, 4, 6],
+                     [0, 6, 2]])
 
-    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
+    L_sp = build_matrix(n_verts, faces, lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     # Test with a single RHS
-    solver = CholeskySolverD(1, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverD(1, n_verts, n_faces, faces, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_verts)
+    b = np.random.random(size=(n_verts,1)).astype(np.float64)
 
-    assert(np.allclose(solver.solve(Float64(b).data_()), factor.solve_A(b)))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
-    n_rhs = 3
-    solver = CholeskySolverD(n_rhs, n_verts, n_faces, faces.data_(), lambda_)
+    n_rhs = 32
+    solver = CholeskySolverD(n_rhs, n_verts, n_faces, faces, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_rhs*n_verts)
-    sol = solver.solve(Float64(b.flatten()).data_())
-    sol_ref = factor.solve_A(b.reshape((n_rhs, n_verts)).T).T.flatten()
+    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float64).T
+    sol = solver.solve(b)
+    sol_ref = factor.solve_A(b)
 
     assert(np.allclose(sol, sol_ref))
 
@@ -95,28 +114,25 @@ def test_ico_float():
 
     lambda_ = 2.0
 
-    faces_numpy = f.flatten()
-    faces = Int(faces_numpy)
-
-    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
+    L_sp = build_matrix(n_verts, f, lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     # Test with a single RHS
-    solver = CholeskySolverF(1, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverF(1, n_verts, n_faces, f, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_verts)
+    b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
-    assert(np.allclose(solver.solve(Float32(b).data_()), factor.solve_A(b)))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
     n_rhs = 32
-    solver = CholeskySolverF(n_rhs, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverF(n_rhs, n_verts, n_faces, f, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_rhs*n_verts)
-    sol = solver.solve(Float32(b.flatten()).data_())
-    sol_ref = factor.solve_A(b.reshape((n_rhs, n_verts)).T).T.flatten()
+    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float32).T
+    sol = solver.solve(b)
+    sol_ref = factor.solve_A(b)
 
     assert(np.allclose(sol, sol_ref))
 
@@ -130,27 +146,24 @@ def test_ico_double():
 
     lambda_ = 2.0
 
-    faces_numpy = f.flatten()
-    faces = Int(faces_numpy)
-
-    L_sp = build_matrix(n_verts, faces_numpy.reshape((-1, 3)), lambda_)
+    L_sp = build_matrix(n_verts, f, lambda_)
     factor = cholmod.cholesky(L_sp, ordering_method='amd', mode='simplicial')
 
     # Test with a single RHS
-    solver = CholeskySolverD(1, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverD(1, n_verts, n_faces, f, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_verts)
+    b = np.random.random(size=(n_verts,1)).astype(np.float64)
 
-    assert(np.allclose(solver.solve(Float64(b).data_()), factor.solve_A(b)))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
     n_rhs = 32
-    solver = CholeskySolverD(n_rhs, n_verts, n_faces, faces.data_(), lambda_)
+    solver = CholeskySolverD(n_rhs, n_verts, n_faces, f, lambda_)
 
     np.random.seed(45)
-    b = np.random.random(size=n_rhs*n_verts)
-    sol = solver.solve(Float64(b.flatten()).data_())
-    sol_ref = factor.solve_A(b.reshape((n_rhs, n_verts)).T).T.flatten()
+    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float64).T
+    sol = solver.solve(b)
+    sol_ref = factor.solve_A(b)
 
     assert(np.allclose(sol, sol_ref))
