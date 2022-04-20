@@ -13,12 +13,16 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
     std::string class_name = std::string("CholeskySolver") + typestr;
     nb::class_<Class>(m, class_name.c_str())
         .def("__init__", [](Class *self,
-                            uint nrhs,
-                            uint n_verts,
-                            uint n_faces,
-                            nb::tensor<int32_t, nb::shape<nb::any, 3>, nb::device::cpu, nb::c_contig> faces,
-                            double lambda){
-            new (self) Class(nrhs, n_verts, n_faces, (int *)faces.data(), lambda);
+                            uint n_rhs,
+                            uint n_rows,
+                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_i,
+                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_j,
+                            nb::tensor<double, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_x){
+
+            std::vector<int> ii((int *)coo_i.data(), (int *)coo_i.data()+coo_i.shape(0));
+            std::vector<int> jj((int *)coo_j.data(), (int *)coo_j.data()+coo_j.shape(0));
+            std::vector<double> data((double *)coo_x.data(), (double *)coo_x.data()+coo_x.shape(0));
+            new (self) Class(n_rhs, n_rows, ii, jj, data);
         })
         .def("solve", [](Class &self, nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cpu, nb::c_contig> b){
             Float *data = self.solve((Float *)b.data());

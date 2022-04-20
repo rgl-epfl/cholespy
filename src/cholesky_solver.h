@@ -7,7 +7,7 @@
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(int nrhs, int n_verts, int n_faces, int *faces, double lambda);
+    CholeskySolver(int n_rhs, int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x);
 
     ~CholeskySolver();
 
@@ -16,11 +16,8 @@ public:
 
 private:
 
-    // Build the (I+λL) matrix in CSC representation
-    void build_matrix(int n_verts, int n_faces, int *faces, double lambda, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data);
-
     // Factorize the CSC matrix using CHOLMOD
-    void factorize(std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data);
+    void factorize(const std::vector<int> &col_ptr, const std::vector<int> &rows, const std::vector<double> &data);
 
     // Run the analysis of a triangular matrix obtained through Cholesky
     void analyze(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);

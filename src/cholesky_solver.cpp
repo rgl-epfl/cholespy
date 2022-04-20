@@ -3,10 +3,161 @@
 #include <algorithm>
 #include <exception>
 
-template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int nrhs, int n_verts, int n_faces, int *faces, double lambda) : m_n(n_verts), m_nrhs(nrhs) {
+// Sparse matrix utility functions, inspired from Scipy https://github.com/scipy/scipy
 
-    if (nrhs >= 128)
+void coo_to_csc(int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
+
+    col_ptr.resize(n_rows+1, 0);
+    rows.resize(coo_x.size(), 0);
+    data.resize(coo_x.size(), 0);
+
+    // Count non zero entries per column
+    for (int i=0; i<coo_x.size(); ++i) {
+        col_ptr[coo_j[i]]++;
+    }
+
+    /*
+    Build the column pointer array, where tmp_col_ptr[i] is the start of the
+    i-th column in the other arrays
+    */
+    for (int i=0, S=0; i<n_rows; i++) {
+        int tmp = col_ptr[i];
+        col_ptr[i] = S;
+        S += tmp;
+    }
+    col_ptr[n_rows] = coo_x.size();
+
+    /*
+    Now move the row indices of each entry so that entries in column j are in
+    positions tmp_col_ptr[j] to tmp_col_ptr[j+1]-1
+    */
+    for (int i=0; i<coo_x.size(); i++) {
+        int col = coo_j[i];
+        int dst = col_ptr[col];
+
+        rows[dst] = coo_i[i];
+        data[dst] = coo_x[i];
+
+        col_ptr[col]++;
+    }
+
+    // Undo the modifications to tmp_col_ptr from the previous step
+    for(int i = 0, last = 0; i <= n_rows; i++){
+        int temp = col_ptr[i];
+        col_ptr[i] = last;
+        last = temp;
+    }
+
+    // We now have a CSC representation of our matrix, potentially with duplicates.
+}
+
+void csr_to_csc(const std::vector<int> &csr_row_ptr, const std::vector<int> &csr_cols, const std::vector<double> &csr_data, std::vector<int> &csc_col_ptr, std::vector<int> &csc_rows, std::vector<double> &csc_data) {
+
+    int n_rows = csr_row_ptr.size()-1;
+
+    csc_col_ptr.resize(n_rows+1, 0);
+    csc_rows.resize(csr_data.size(), 0);
+    csc_data.resize(csr_data.size(), 0);
+
+    // Count non zero entries per column
+    for (int i=0; i<csr_data.size(); ++i) {
+        csc_col_ptr[csr_cols[i]]++;
+    }
+
+    /*
+    Build the column pointer array, where tmp_col_ptr[i] is the start of the
+    i-th column in the other arrays
+    */
+    for (int i=0, S=0; i<n_rows; ++i) {
+        int tmp = csc_col_ptr[i];
+        csc_col_ptr[i] = S;
+        S += tmp;
+    }
+    csc_col_ptr[n_rows] = csr_data.size();
+
+    /*
+    Now move the row indices of each entry so that entries in column j are in
+    positions tmp_col_ptr[j] to tmp_col_ptr[j+1]-1
+    */
+    for (int i=0; i<n_rows; ++i) {
+        for (int j=csr_row_ptr[i]; j<csr_row_ptr[i+1]; ++j){
+            int col = csr_cols[j];
+            int dst = csc_col_ptr[col];
+
+            csc_rows[dst] = i;
+            csc_data[dst] = csr_data[j];
+
+            csc_col_ptr[col]++;
+        }
+    }
+
+    // Undo the modifications to tmp_col_ptr from the previous step
+    for(int i = 0, last = 0; i <= n_rows; ++i){
+        int temp = csc_col_ptr[i];
+        csc_col_ptr[i] = last;
+        last = temp;
+    }
+
+    // We now have a CSC representation of our matrix, potentially with duplicates.
+}
+
+// Re-order (in place) the data of a CSC matrix so that row indices are sorted
+void csc_sort_indices(std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
+    std::vector<std::pair<int, double>> tmp;
+    int n_rows = col_ptr.size() - 1;
+
+    for (int i=0; i<n_rows; ++i) {
+        int col_start = col_ptr[i], col_end = col_ptr[i+1];
+        tmp.resize(col_end - col_start);
+        // Fill the temporary pair array with the entriex from the current column
+        for (int j=col_start; j<col_end; ++j) {
+            tmp[j - col_start].first = rows[j];
+            tmp[j - col_start].second = data[j];
+        }
+
+        // Sort the row
+        std::sort(tmp.begin(), tmp.end(), [](std::pair<int, double> &a, std::pair<int, double> &b){return a.first < b.first;});
+
+        // Re order
+        for (int j=col_start; j<col_end; ++j) {
+            rows[j] = tmp[j - col_start].first;
+            data[j] = tmp[j - col_start].second;
+        }
+    }
+}
+
+// Sum all duplicate entries in a CSC matrix (with sorted indices) and modify it in place
+void csc_sum_duplicates(std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
+    int n_rows = col_ptr.size() - 1;
+    int nnz = 0;
+    int col_end = 0;
+
+    for (int i=0; i<n_rows; ++i) {
+        int j = col_end;
+        col_end = col_ptr[i+1];
+        while (j < col_end) {
+            int row = rows[j];
+            double x = data[j];
+            j++;
+            // Sum consecutive entries with same row index
+            while (j < col_end && rows[j] == row)
+                x += data[j++];
+            rows[nnz] = row;
+            data[nnz] = x;
+            nnz++;
+        }
+        col_ptr[i+1] = nnz;
+    }
+
+    // Remove the last (unused) elements
+    rows.resize(nnz);
+    data.resize(nnz);
+}
+
+template <typename Float>
+CholeskySolver<Float>::CholeskySolver(int n_rhs, int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x) : m_n(n_rows), m_nrhs(n_rhs) {
+
+    if (n_rhs >= 128)
         throw std::invalid_argument("The number of RHS should be less than 128.");
 
     // Initialize CUDA and load the kernels if not already done
@@ -16,8 +167,13 @@ CholeskySolver<Float>::CholeskySolver(int nrhs, int n_verts, int n_faces, int *f
     std::vector<int> col_ptr, rows;
     std::vector<double> data;
 
-    // Build the actual matrix
-    build_matrix(n_verts, n_faces, faces, lambda, col_ptr, rows, data);
+    // Convert the matrix to CSC
+    // TODO: support CSC and CSR inputs as well
+    coo_to_csc(n_rows, coo_i, coo_j, coo_x, col_ptr, rows, data);
+
+    // CHOLMOD expects a CSC matrix without duplicate entries, so we sum them:
+    csc_sort_indices(col_ptr, rows, data);
+    csc_sum_duplicates(col_ptr, rows, data);
 
     // Mask of rows already processed
     cuda_check(cuMemAlloc(&m_processed_rows_d, m_n*sizeof(bool)));
@@ -35,145 +191,7 @@ CholeskySolver<Float>::CholeskySolver(int nrhs, int n_verts, int n_faces, int *f
 }
 
 template <typename Float>
-void CholeskySolver<Float>::build_matrix(int n_verts, int n_faces, int *faces, double lambda, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
-    // We start by building the (lower half of the) (I + λ L) matrix in the COO format.
-
-    // indices of nonzero entries
-    std::vector<int> ii;
-    std::vector<int> jj;
-
-    // Heuristic based on average connectivity on a triangle mesh.
-    ii.reserve(7 * n_verts);
-    jj.reserve(7 * n_verts);
-    std::vector<int> col_entries;
-    col_entries.resize(n_verts, 0);
-
-    // Add one entry per edge
-    for (int i=0; i<n_faces; i++) {
-        for (int j=0; j<3; j++) {
-            for (int k=j+1; k<3; k++) {
-                int s = faces[3*i + j];
-                int d = faces[3*i + k];
-                if (s > d) {
-                    // L[s,d]
-                    ii.push_back(s);
-                    jj.push_back(d);
-                    col_entries[d]++;
-                } else {
-                    // L[d,s]
-                    ii.push_back(d);
-                    jj.push_back(s);
-                    col_entries[s]++;
-                }
-            }
-        }
-    }
-
-    // Add diagonal indices
-    for(int i=0; i<n_verts; i++) {
-        ii.push_back(i);
-        jj.push_back(i);
-        col_entries[i]++;
-    }
-
-    ii.shrink_to_fit();
-    jj.shrink_to_fit();
-
-    int nnz = ii.size();
-
-    // Then we convert the COO representation to CSC
-
-    std::vector<int> tmp_col_ptr;
-    tmp_col_ptr.resize(n_faces+1, 0);
-    std::vector<int> tmp_rows;
-    tmp_rows.resize(nnz, 0);
-
-    /*
-    Build the column pointer array, where tmp_col_ptr[i] is the start of the
-    i-th column in the other arrays
-    */
-    int cumsum=0;
-    for (int i=0; i<n_verts; i++) {
-        tmp_col_ptr[i] = cumsum;
-        cumsum += col_entries[i];
-    }
-    tmp_col_ptr[n_verts] = cumsum;
-
-    /*
-    Now move the row indices of each entry so that entries in column j are in
-    positions tmp_col_ptr[j] to tmp_col_ptr[j+1]-1
-    */
-    for (int i=0; i<nnz; i++) {
-        int col = jj[i];
-        int dst = tmp_col_ptr[col];
-
-        tmp_rows[dst] = ii[i];
-        tmp_col_ptr[col]++;
-    }
-
-    // Undo the modifications to tmp_col_ptr from the previous step
-    for(int i = 0, last = 0; i <= n_verts; i++){
-        int temp = tmp_col_ptr[i];
-        tmp_col_ptr[i] = last;
-        last = temp;
-    }
-
-    // Sort indices in each column to ease the removal of duplicates
-    for (int i=0; i<n_verts; i++) {
-        std::sort(tmp_rows.begin() + tmp_col_ptr[i], tmp_rows.begin() + tmp_col_ptr[i+1]);
-    }
-
-    rows.reserve(nnz);
-    data.reserve(nnz);
-    col_ptr.resize(n_verts+1, 0);
-    cumsum = 0;
-
-    std::vector<int> adjacency;
-    adjacency.resize(n_verts, 0);
-    // Remove duplicates
-    for (int col=0; col<n_verts; col++) {
-        int i = tmp_col_ptr[col];
-        int n_elements = 0;
-        int row = tmp_rows[i];
-        while (i<tmp_col_ptr[col+1]) {
-            if (row != col) {
-                // Count unique off diag entries per row
-                // We increment both indices because we only store half of the entries
-                adjacency[row]++;
-                adjacency[col]++;
-            }
-            rows.push_back(row);
-            data.push_back(-lambda);
-            n_elements++;
-            int previous_row = row;
-            while (row == previous_row && i<tmp_col_ptr[col+1]) {
-                // Ignore duplicate entries (all off-diagonal entries of the laplacian are ones)
-                i++;
-                row = tmp_rows[i];
-            }
-        }
-        // Correct element count
-        col_entries[col] = n_elements;
-        // Correct column start pointer
-        col_ptr[col] = cumsum;
-        cumsum += n_elements;
-    }
-    col_ptr[n_verts] = cumsum;
-    data.shrink_to_fit();
-    rows.shrink_to_fit();
-
-    // Set diagonal indices proper values
-    for (int j=0; j<n_verts; j++) {
-        for (int i=col_ptr[j]; i<col_ptr[j+1]; i++) {
-            if (j == rows[i]) // diagonal element
-                data[i] = adjacency[j] * lambda + 1.0;
-        }
-    }
-
-}
-
-template <typename Float>
-void CholeskySolver<Float>::factorize(std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
+void CholeskySolver<Float>::factorize(const std::vector<int> &col_ptr, const std::vector<int> &rows, const std::vector<double> &data) {
     cholmod_sparse *A;
     cholmod_factor *F;
     cholmod_common c;
