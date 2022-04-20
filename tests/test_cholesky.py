@@ -46,24 +46,19 @@ def test_cube_float():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    # Test with a single RHS
-    solver = CholeskySolverF(1, n_verts, idx[0], idx[1], values)
+    solver = CholeskySolverF(n_verts, idx[0], idx[1], values)
 
     np.random.seed(45)
+
+    # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
-    n_rhs = 32
-    solver = CholeskySolverF(n_rhs, n_verts, idx[0], idx[1], values)
+    b = np.random.random(size=(32, n_verts)).astype(np.float32).T
 
-    np.random.seed(45)
-    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float32).T
-    sol = solver.solve(b)
-    sol_ref = factor.solve_A(b)
-
-    assert(np.allclose(sol, sol_ref))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
 def test_cube_double():
     n_verts = 8
@@ -88,24 +83,19 @@ def test_cube_double():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    # Test with a single RHS
-    solver = CholeskySolverD(1, n_verts, idx[0], idx[1], values)
+    solver = CholeskySolverD(n_verts, idx[0], idx[1], values)
 
     np.random.seed(45)
+
+    # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float64)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
-    n_rhs = 32
-    solver = CholeskySolverD(n_rhs, n_verts, idx[0], idx[1], values)
+    b = np.random.random(size=(32, n_verts)).astype(np.float64).T
 
-    np.random.seed(45)
-    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float64).T
-    sol = solver.solve(b)
-    sol_ref = factor.solve_A(b)
-
-    assert(np.allclose(sol, sol_ref))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
 def test_ico_float():
     import igl
@@ -122,24 +112,19 @@ def test_ico_float():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    # Test with a single RHS
-    solver = CholeskySolverF(1, n_verts, idx[0], idx[1], values)
+    solver = CholeskySolverF(n_verts, idx[0], idx[1], values)
 
     np.random.seed(45)
+
+    # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
-    n_rhs = 32
-    solver = CholeskySolverF(n_rhs, n_verts, idx[0], idx[1], values)
+    b = np.random.random(size=(32, n_verts)).astype(np.float32).T
 
-    np.random.seed(45)
-    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float32).T
-    sol = solver.solve(b)
-    sol_ref = factor.solve_A(b)
-
-    assert(np.allclose(sol, sol_ref))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
 def test_ico_double():
     import igl
@@ -156,21 +141,16 @@ def test_ico_double():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    # Test with a single RHS
-    solver = CholeskySolverD(1, n_verts, idx[0], idx[1], values)
+    solver = CholeskySolverD(n_verts, idx[0], idx[1], values)
 
     np.random.seed(45)
+
+    # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float64)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
     # Test with several RHS
-    n_rhs = 32
-    solver = CholeskySolverD(n_rhs, n_verts, idx[0], idx[1], values)
+    b = np.random.random(size=(32, n_verts)).astype(np.float64).T
 
-    np.random.seed(45)
-    b = np.random.random(size=(n_rhs, n_verts)).astype(np.float64).T
-    sol = solver.solve(b)
-    sol_ref = factor.solve_A(b)
-
-    assert(np.allclose(sol, sol_ref))
+    assert(np.allclose(solver.solve(b), factor.solve_A(b)))

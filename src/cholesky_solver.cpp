@@ -155,10 +155,7 @@ void csc_sum_duplicates(std::vector<int> &col_ptr, std::vector<int> &rows, std::
 }
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int n_rhs, int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x) : m_n(n_rows), m_nrhs(n_rhs) {
-
-    if (n_rhs >= 128)
-        throw std::invalid_argument("The number of RHS should be less than 128.");
+CholeskySolver<Float>::CholeskySolver(int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x) : m_n(n_rows) {
 
     // Initialize CUDA and load the kernels if not already done
     initCuda();
@@ -185,9 +182,6 @@ CholeskySolver<Float>::CholeskySolver(int n_rhs, int n_rows, const std::vector<i
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
     factorize(col_ptr, rows, data);
-
-    // Allocate space for the solution
-    cuda_check(cuMemAlloc(&m_x_d, m_n*m_nrhs*sizeof(Float)));
 }
 
 template <typename Float>
@@ -403,8 +397,18 @@ void CholeskySolver<Float>::solve(bool lower) {
 }
 
 template <typename Float>
-Float *CholeskySolver<Float>::solve(Float *b) {
+Float *CholeskySolver<Float>::solve(int n_rhs, Float *b) {
     // TODO fallback to cholmod in the CPU array case
+    if (n_rhs != m_nrhs) {
+        if (n_rhs > 128)
+            throw std::invalid_argument("The number of RHS should be less than 128.");
+        // We need to modify the allocated memory for the solution
+        if (m_x_d)
+            cuda_check(cuMemFree(m_x_d));
+        cuda_check(cuMemAlloc(&m_x_d, n_rhs * m_n * sizeof(Float)));
+        m_nrhs = n_rhs;
+    }
+
     // TODO: Do this on the GPU?
     Float *tmp = (Float *)malloc(m_n * m_nrhs * sizeof(Float));
     for (int i=0; i<m_n; ++i) {

@@ -7,12 +7,12 @@
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(int n_rhs, int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x);
+    CholeskySolver(int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x);
 
     ~CholeskySolver();
 
     // Solve the whole system using the Cholesky factorization
-    Float *solve(Float *b);
+    Float *solve(int n_rhs, Float *b);
 
 private:
 
@@ -25,7 +25,7 @@ private:
 	// Solve one triangular system
     void solve(bool lower);
 
-    int m_nrhs;
+    int m_nrhs = 0;
     int m_n;
     int *m_perm;
 
@@ -50,5 +50,5 @@ private:
     CUdeviceptr m_upper_levels_d;
 
     // Solution GPU address
-    CUdeviceptr m_x_d;
+    CUdeviceptr m_x_d = 0;
 };

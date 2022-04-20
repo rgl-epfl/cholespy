@@ -13,7 +13,6 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
     std::string class_name = std::string("CholeskySolver") + typestr;
     nb::class_<Class>(m, class_name.c_str())
         .def("__init__", [](Class *self,
-                            uint n_rhs,
                             uint n_rows,
                             nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_i,
                             nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_j,
@@ -22,10 +21,10 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
             std::vector<int> ii((int *)coo_i.data(), (int *)coo_i.data()+coo_i.shape(0));
             std::vector<int> jj((int *)coo_j.data(), (int *)coo_j.data()+coo_j.shape(0));
             std::vector<double> data((double *)coo_x.data(), (double *)coo_x.data()+coo_x.shape(0));
-            new (self) Class(n_rhs, n_rows, ii, jj, data);
+            new (self) Class(n_rows, ii, jj, data);
         })
         .def("solve", [](Class &self, nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cpu, nb::c_contig> b){
-            Float *data = self.solve((Float *)b.data());
+            Float *data = self.solve(b.shape(1), (Float *)b.data());
             // Delete 'data' when the 'owner' capsule expires
             nb::capsule owner(data, [](void *p) {
                 delete[] (Float *) p;
