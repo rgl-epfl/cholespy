@@ -4,10 +4,17 @@
 #include <vector>
 #include "cholmod.h"
 #include <cuda.h>
+
+enum MatrixType {
+    CSC = 0,
+    CSR,
+    COO
+};
+
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x);
+    CholeskySolver(int n_rows, std::vector<int> &ii, std::vector<int> &jj, std::vector<double> &x, MatrixType type);
 
     ~CholeskySolver();
 

@@ -14,14 +14,15 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
     nb::class_<Class>(m, class_name.c_str())
         .def("__init__", [](Class *self,
                             uint n_rows,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_i,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_j,
-                            nb::tensor<double, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> coo_x){
+                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> ii,
+                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> jj,
+                            nb::tensor<double, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> x,
+                            MatrixType type){
 
-            std::vector<int> ii((int *)coo_i.data(), (int *)coo_i.data()+coo_i.shape(0));
-            std::vector<int> jj((int *)coo_j.data(), (int *)coo_j.data()+coo_j.shape(0));
-            std::vector<double> data((double *)coo_x.data(), (double *)coo_x.data()+coo_x.shape(0));
-            new (self) Class(n_rows, ii, jj, data);
+            std::vector<int> indices_a((int *)ii.data(), (int *)ii.data()+ii.shape(0));
+            std::vector<int> indices_b((int *)jj.data(), (int *)jj.data()+jj.shape(0));
+            std::vector<double> data((double *)x.data(), (double *)x.data()+x.shape(0));
+            new (self) Class(n_rows, indices_a, indices_b, data, type);
         })
         .def("solve", [](Class &self, nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cpu, nb::c_contig> b){
             Float *data = self.solve(b.shape(1), (Float *)b.data());
@@ -35,6 +36,11 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
 }
 
 NB_MODULE(_cholesky_core, m) {
+
+    nb::enum_<MatrixType>(m, "MatrixType")
+        .value("CSC", MatrixType::CSC)
+        .value("CSR", MatrixType::CSR)
+        .value("COO", MatrixType::COO);
 
     declare_cholesky<float>(m, "F");
     declare_cholesky<double>(m, "D");

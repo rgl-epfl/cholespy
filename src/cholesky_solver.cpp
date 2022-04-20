@@ -155,7 +155,7 @@ void csc_sum_duplicates(std::vector<int> &col_ptr, std::vector<int> &rows, std::
 }
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x) : m_n(n_rows) {
+CholeskySolver<Float>::CholeskySolver(int n_rows, std::vector<int> &ii, std::vector<int> &jj, std::vector<double> &x, MatrixType type) : m_n(n_rows) {
 
     // Initialize CUDA and load the kernels if not already done
     initCuda();
@@ -164,9 +164,28 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, const std::vector<int> &coo_i,
     std::vector<int> col_ptr, rows;
     std::vector<double> data;
 
-    // Convert the matrix to CSC
-    // TODO: support CSC and CSR inputs as well
-    coo_to_csc(n_rows, coo_i, coo_j, coo_x, col_ptr, rows, data);
+    // Check the matrix and convert it to CSC if necessary
+    if (type == MatrixType::COO) {
+        if (ii.size() != jj.size())
+            throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
+        if (ii.size() != x.size())
+            throw std::invalid_argument("Sparse COO matrix: the index and data arrays should have the same size.");
+        coo_to_csc(n_rows, ii, jj, x, col_ptr, rows, data);
+    } else if (type == MatrixType::CSR) {
+        if (jj.size() != x.size())
+            throw std::invalid_argument("Sparse CSR matrix: the column index and data arrays should have the same size.");
+        if (ii.size() != n_rows+1)
+            throw std::invalid_argument("Sparse CSR matrix: Invalid size for row pointer array.");
+        csr_to_csc(ii, jj, x, col_ptr, rows, data);
+    } else {
+        if (jj.size() != x.size())
+            throw std::invalid_argument("Sparse CSC matrix: the row index and data arrays should have the same size.");
+        if (ii.size() != n_rows+1)
+            throw std::invalid_argument("Sparse CSC matrix: Invalid size for column pointer array.");
+        col_ptr = ii;
+        rows = jj;
+        data = x;
+    }
 
     // CHOLMOD expects a CSC matrix without duplicate entries, so we sum them:
     csc_sort_indices(col_ptr, rows, data);

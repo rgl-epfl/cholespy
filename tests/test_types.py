@@ -23,7 +23,7 @@ def get_coo_arrays(n_verts, faces, lambda_):
 
     return values, idx
 
-def test_cube_float():
+def test_coo():
     n_verts = 8
     n_faces = 12
     lambda_ = 2.0
@@ -50,17 +50,11 @@ def test_cube_float():
 
     np.random.seed(45)
 
-    # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
-    # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float32).T
-
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
-
-def test_cube_double():
+def test_csr():
     n_verts = 8
     n_faces = 12
     lambda_ = 2.0
@@ -83,74 +77,42 @@ def test_cube_double():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverD(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    L_csr = L_csc.tocsr()
+    solver = CholeskySolverF(n_verts, L_csr.indptr, L_csr.indices, L_csr.data, MatrixType.CSR)
 
     np.random.seed(45)
 
-    # Test with a single RHS
-    b = np.random.random(size=(n_verts,1)).astype(np.float64)
-
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
-
-    # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float64).T
-
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
-
-def test_ico_float():
-    import igl
-    import os
-    v, f = igl.read_triangle_mesh(os.path.join(os.path.dirname(__file__), "ico.ply"))
-
-    n_faces = len(f)
-    n_verts = len(v)
-
-    lambda_ = 2.0
-
-    values, idx = get_coo_arrays(n_verts, f, lambda_)
-
-    L_csc = sp.csc_matrix((values, idx))
-    factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
-
-    solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
-
-    np.random.seed(45)
-
-    # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
 
-    # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float32).T
-
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
-
-def test_ico_double():
-    import igl
-    import os
-    v, f = igl.read_triangle_mesh(os.path.join(os.path.dirname(__file__), "ico.ply"))
-
-    n_faces = len(f)
-    n_verts = len(v)
-
+def test_csc():
+    n_verts = 8
+    n_faces = 12
     lambda_ = 2.0
 
-    values, idx = get_coo_arrays(n_verts, f, lambda_)
+    faces = np.array([[0, 1, 3],
+                     [0, 3, 2],
+                     [2, 3, 7],
+                     [2, 7, 6],
+                     [4, 5, 7],
+                     [4, 7, 6],
+                     [0, 1, 5],
+                     [0, 5, 4],
+                     [1, 5, 7],
+                     [1, 7, 3],
+                     [0, 4, 6],
+                     [0, 6, 2]])
+
+    values, idx = get_coo_arrays(n_verts, faces, lambda_)
 
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverD(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    solver = CholeskySolverF(n_verts, L_csc.indptr, L_csc.indices, L_csc.data, MatrixType.CSC)
 
     np.random.seed(45)
 
-    # Test with a single RHS
-    b = np.random.random(size=(n_verts,1)).astype(np.float64)
-
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
-
-    # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float64).T
+    b = np.random.random(size=(n_verts,1)).astype(np.float32)
 
     assert(np.allclose(solver.solve(b), factor.solve_A(b)))
