@@ -165,23 +165,11 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, std::vector<int> &ii, std::vec
     std::vector<double> data;
 
     // Check the matrix and convert it to CSC if necessary
-    if (type == MatrixType::COO) {
-        if (ii.size() != jj.size())
-            throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
-        if (ii.size() != x.size())
-            throw std::invalid_argument("Sparse COO matrix: the index and data arrays should have the same size.");
+    if (type == MatrixType::COO)
         coo_to_csc(n_rows, ii, jj, x, col_ptr, rows, data);
-    } else if (type == MatrixType::CSR) {
-        if (jj.size() != x.size())
-            throw std::invalid_argument("Sparse CSR matrix: the column index and data arrays should have the same size.");
-        if (ii.size() != n_rows+1)
-            throw std::invalid_argument("Sparse CSR matrix: Invalid size for row pointer array.");
+    else if (type == MatrixType::CSR)
         csr_to_csc(ii, jj, x, col_ptr, rows, data);
-    } else {
-        if (jj.size() != x.size())
-            throw std::invalid_argument("Sparse CSC matrix: the row index and data arrays should have the same size.");
-        if (ii.size() != n_rows+1)
-            throw std::invalid_argument("Sparse CSC matrix: Invalid size for column pointer array.");
+    else {
         col_ptr = ii;
         rows = jj;
         data = x;
@@ -247,11 +235,8 @@ void CholeskySolver<Float>::factorize(const std::vector<int> &col_ptr, const std
     cholmod_factorize(A, F, &c);
 
     // Copy permutation
-    m_perm = (int *) malloc(m_n*sizeof(int));
-    int *perm = (int *) F->Perm;
-    for (int i=0; i<m_n; i++) {
-        m_perm[i] = perm[i];
-    }
+    cuda_check(cuMemAlloc(&m_perm_d, m_n*sizeof(int)));
+    cuda_check(cuMemcpyHtoDAsync(m_perm_d, F->Perm, m_n*sizeof(int), 0));
 
     cholmod_sparse *lower_csc = cholmod_factor_to_sparse(F, &c);
     // The transpose of a CSC (resp. CSR) matrix is its CSR (resp. CSC) representation
@@ -381,7 +366,7 @@ void CholeskySolver<Float>::analyze(int n_rows, int n_entries, void *csr_rows, v
 }
 
 template<typename Float>
-void CholeskySolver<Float>::solve(bool lower) {
+void CholeskySolver<Float>::launch_kernel(bool lower, CUdeviceptr x) {
     // Initialize buffers
     cuda_check(cuMemsetD8(m_processed_rows_d, 0, m_n)); // Initialize to all false
     cuda_check(cuMemsetD32(m_stack_id_d, 0, 1));
@@ -391,7 +376,7 @@ void CholeskySolver<Float>::solve(bool lower) {
     CUdeviceptr data_d = (lower ? m_lower_data_d : m_upper_data_d);
     CUdeviceptr levels_d = (lower ? m_lower_levels_d : m_upper_levels_d);
 
-    void *args[9] = {
+    void *args[11] = {
         &m_nrhs,
         &m_n,
         &m_stack_id_d,
@@ -400,7 +385,9 @@ void CholeskySolver<Float>::solve(bool lower) {
         &rows_d,
         &cols_d,
         &data_d,
-        &m_x_d,
+        &m_tmp_d,
+        &x, // This is the array we read from (i.e. b) for lower, and where we write to (i.e. x) for upper
+        &m_perm_d
     };
 
     CUfunction solve_kernel;
@@ -416,53 +403,33 @@ void CholeskySolver<Float>::solve(bool lower) {
 }
 
 template <typename Float>
-Float *CholeskySolver<Float>::solve(int n_rhs, Float *b) {
+void CholeskySolver<Float>::solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x) {
     // TODO fallback to cholmod in the CPU array case
     if (n_rhs != m_nrhs) {
         if (n_rhs > 128)
             throw std::invalid_argument("The number of RHS should be less than 128.");
         // We need to modify the allocated memory for the solution
-        if (m_x_d)
-            cuda_check(cuMemFree(m_x_d));
-        cuda_check(cuMemAlloc(&m_x_d, n_rhs * m_n * sizeof(Float)));
+        if (m_tmp_d)
+            cuda_check(cuMemFree(m_tmp_d));
+        cuda_check(cuMemAlloc(&m_tmp_d, n_rhs * m_n * sizeof(Float)));
         m_nrhs = n_rhs;
     }
 
-    // TODO: Do this on the GPU?
-    Float *tmp = (Float *)malloc(m_n * m_nrhs * sizeof(Float));
-    for (int i=0; i<m_n; ++i) {
-        for (int j=0; j<m_nrhs; ++j) {
-            tmp[i*m_nrhs + j] = b[m_perm[i]*m_nrhs + j];
-        }
-    }
-
-    cuda_check(cuMemcpyHtoDAsync(m_x_d, tmp, m_n*m_nrhs*sizeof(Float), 0));
-
-    solve(true);
-    solve(false);
-
-    cuda_check(cuMemcpyDtoHAsync(tmp, m_x_d, m_n*m_nrhs*sizeof(Float), 0));
-
-    Float *sol = (Float *)malloc(m_n * m_nrhs * sizeof(Float));//TODO: this is destroyed on the python side, could be done better
-    // Invert permutation
-    for (int i=0; i<m_n; ++i) {
-        for (int j=0; j<m_nrhs; ++j)
-            sol[m_perm[i]*m_nrhs + j] = tmp[i*m_nrhs + j];
-    }
-
-    free(tmp);
-    return sol;
+    // Solve lower
+    launch_kernel(true, b);
+    // Solve upper
+    launch_kernel(false, x);
 }
 
 template <typename Float>
 CholeskySolver<Float>::~CholeskySolver() {
-    free(m_perm);
-
     cuda_check(cuMemFree(m_processed_rows_d));
 
     cuda_check(cuMemFree(m_stack_id_d));
 
-    cuda_check(cuMemFree(m_x_d));
+    cuda_check(cuMemFree(m_perm_d));
+
+    cuda_check(cuMemFree(m_tmp_d));
 
     cuda_check(cuMemFree(m_lower_rows_d));
     cuda_check(cuMemFree(m_lower_cols_d));

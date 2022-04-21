@@ -1,8 +1,9 @@
 import pytest
-from cholesky import CholeskySolverD, CholeskySolverF, MatrixType
+from cholesky import CholeskySolverF, MatrixType
 import numpy as np
 import sksparse.cholmod as cholmod
 import scipy.sparse as sp
+import torch
 
 def get_coo_arrays(n_verts, faces, lambda_):
 
@@ -25,7 +26,6 @@ def get_coo_arrays(n_verts, faces, lambda_):
 
 def test_coo():
     n_verts = 8
-    n_faces = 12
     lambda_ = 2.0
 
     faces = np.array([[0, 1, 3],
@@ -46,17 +46,19 @@ def test_coo():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
 
     np.random.seed(45)
+    b = np.random.random(size=(n_verts, 32)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    b = np.random.random(size=(n_verts,1)).astype(np.float32)
+    solver.solve(b_torch, x_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
 def test_csr():
     n_verts = 8
-    n_faces = 12
     lambda_ = 2.0
 
     faces = np.array([[0, 1, 3],
@@ -78,17 +80,19 @@ def test_csr():
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
     L_csr = L_csc.tocsr()
-    solver = CholeskySolverF(n_verts, L_csr.indptr, L_csr.indices, L_csr.data, MatrixType.CSR)
+    solver = CholeskySolverF(n_verts, torch.tensor(L_csr.indptr, device='cuda'), torch.tensor(L_csr.indices, device='cuda'), torch.tensor(L_csr.data, device='cuda'), MatrixType.CSR)
 
     np.random.seed(45)
+    b = np.random.random(size=(n_verts, 32)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    b = np.random.random(size=(n_verts,1)).astype(np.float32)
+    solver.solve(b_torch, x_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
 def test_csc():
     n_verts = 8
-    n_faces = 12
     lambda_ = 2.0
 
     faces = np.array([[0, 1, 3],
@@ -109,10 +113,13 @@ def test_csc():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverF(n_verts, L_csc.indptr, L_csc.indices, L_csc.data, MatrixType.CSC)
+    solver = CholeskySolverF(n_verts, torch.tensor(L_csc.indptr, device='cuda'), torch.tensor(L_csc.indices, device='cuda'), torch.tensor(L_csc.data, device='cuda'), MatrixType.CSC)
 
     np.random.seed(45)
+    b = np.random.random(size=(n_verts, 32)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    b = np.random.random(size=(n_verts,1)).astype(np.float32)
+    solver.solve(b_torch, x_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))

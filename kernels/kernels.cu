@@ -61,9 +61,8 @@ extern "C" __global__ void analysis_upper(int n_rows, int *max_lvl, volatile boo
 
 // Solve kernels
 
-
 template<typename Float>
-__device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, volatile bool *solved_rows, int *rows, int *columns, Float *values, volatile Float *x) {
+__device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, volatile bool *solved_rows, int *rows, int *columns, Float *values, volatile Float *x, Float *b, int *perm) {
 
     __shared__ int lvl_idx;
     __shared__ int cols_cache[CACHE_SIZE];
@@ -85,7 +84,7 @@ __device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, vol
     Float diag_entry = values[row_end];
     Float r;
     if (thread_idx < nrhs)
-        r = x[row * nrhs + thread_idx];
+        r = b[perm[row] * nrhs + thread_idx];
     int col;
     Float val;
     for (int i=row_start; i<row_end; ++i) {
@@ -132,7 +131,7 @@ __device__ void solve_lower(int nrhs, int nrows, int *stack_id, int *levels, vol
 }
 
 template<typename Float>
-__device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, volatile bool *solved_rows, int *rows, int *columns, Float *values, volatile Float *x) {
+__device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, volatile bool *solved_rows, int *rows, int *columns, Float *values, volatile Float *x, Float *b, int *perm) {
 
     __shared__ int lvl_idx;
     __shared__ int cols_cache[CACHE_SIZE];
@@ -185,8 +184,10 @@ __device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, vol
     }
 
     // Write the final value
-    if (thread_idx < nrhs)
+    if (thread_idx < nrhs) {
         x[row * nrhs + thread_idx] = r / diag_entry;
+        b[perm[row] * nrhs + thread_idx] = r / diag_entry;
+    }
 
 
     // Make sure we write all entries before signaling other blocks
@@ -200,18 +201,18 @@ __device__ void solve_upper(int nrhs, int nrows, int *stack_id, int *levels, vol
     solved_rows[row] = true;
 }
 
-extern "C" __global__ void solve_lower_float(int nrhs, int nrows, int *stack_id,  int *levels, bool *solved_rows, int *rows, int *columns, float *values, float*x) {
-    solve_lower<float>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
+extern "C" __global__ void solve_lower_float(int nrhs, int nrows, int *stack_id,  int *levels, bool *solved_rows, int *rows, int *columns, float *values, float *x, float *b, int *perm) {
+    solve_lower<float>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x, b, perm);
 }
 
-extern "C" __global__ void solve_lower_double(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, double *values, double*x) {
-    solve_lower<double>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
+extern "C" __global__ void solve_lower_double(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, double *values, double *x, double *b, int *perm) {
+    solve_lower<double>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x, b, perm);
 }
 
-extern "C" __global__ void solve_upper_float(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, float *values, float*x) {
-    solve_upper<float>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
+extern "C" __global__ void solve_upper_float(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, float *values, float *x, float *b, int *perm) {
+    solve_upper<float>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x, b, perm);
 }
 
-extern "C" __global__ void solve_upper_double(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, double *values, double*x) {
-    solve_upper<double>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x);
+extern "C" __global__ void solve_upper_double(int nrhs, int nrows, int *stack_id, int *levels, bool *solved_rows, int *rows, int *columns, double *values, double *x, double *b, int *perm) {
+    solve_upper<double>(nrhs, nrows, stack_id, levels, solved_rows, rows, columns, values, x, b, perm);
 }

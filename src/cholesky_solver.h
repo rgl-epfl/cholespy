@@ -19,7 +19,7 @@ public:
     ~CholeskySolver();
 
     // Solve the whole system using the Cholesky factorization
-    Float *solve(int n_rhs, Float *b);
+    void solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x);
 
 private:
 
@@ -30,11 +30,13 @@ private:
     void analyze(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);
 
 	// Solve one triangular system
-    void solve(bool lower);
+    void launch_kernel(bool lower, CUdeviceptr x);
 
     int m_nrhs = 0;
     int m_n;
-    int *m_perm;
+
+    // Permutation
+    CUdeviceptr m_perm_d;
 
     // CSR Lower triangular
     CUdeviceptr m_lower_rows_d;
@@ -56,6 +58,6 @@ private:
     CUdeviceptr m_lower_levels_d;
     CUdeviceptr m_upper_levels_d;
 
-    // Solution GPU address
-    CUdeviceptr m_x_d = 0;
+    // Temporary array used for solving the triangular systems in place
+    CUdeviceptr m_tmp_d = 0;
 };

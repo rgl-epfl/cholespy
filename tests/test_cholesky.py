@@ -3,6 +3,7 @@ from cholesky import CholeskySolverD, CholeskySolverF, MatrixType
 import numpy as np
 import sksparse.cholmod as cholmod
 import scipy.sparse as sp
+import torch
 
 def get_coo_arrays(n_verts, faces, lambda_):
 
@@ -25,7 +26,6 @@ def get_coo_arrays(n_verts, faces, lambda_):
 
 def test_cube_float():
     n_verts = 8
-    n_faces = 12
     lambda_ = 2.0
 
     faces = np.array([[0, 1, 3],
@@ -46,23 +46,30 @@ def test_cube_float():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
 
     np.random.seed(45)
 
     # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
     # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float32).T
+    b = np.random.random(size=(n_verts, 32)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
 def test_cube_double():
     n_verts = 8
-    n_faces = 12
     lambda_ = 2.0
 
     faces = np.array([[0, 1, 3],
@@ -83,26 +90,33 @@ def test_cube_double():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverD(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    solver = CholeskySolverD(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
 
     np.random.seed(45)
 
     # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float64)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
     # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float64).T
+    b = np.random.random(size=(n_verts, 32)).astype(np.float64)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
 def test_ico_float():
     import igl
     import os
     v, f = igl.read_triangle_mesh(os.path.join(os.path.dirname(__file__), "ico.ply"))
 
-    n_faces = len(f)
     n_verts = len(v)
 
     lambda_ = 2.0
@@ -112,26 +126,33 @@ def test_ico_float():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
 
     np.random.seed(45)
 
     # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
     # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float32).T
+    b = np.random.random(size=(n_verts, 32)).astype(np.float32)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
 def test_ico_double():
     import igl
     import os
     v, f = igl.read_triangle_mesh(os.path.join(os.path.dirname(__file__), "ico.ply"))
 
-    n_faces = len(f)
     n_verts = len(v)
 
     lambda_ = 2.0
@@ -141,16 +162,24 @@ def test_ico_double():
     L_csc = sp.csc_matrix((values, idx))
     factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
 
-    solver = CholeskySolverD(n_verts, idx[0], idx[1], values, MatrixType.COO)
+    solver = CholeskySolverD(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
 
     np.random.seed(45)
 
     # Test with a single RHS
     b = np.random.random(size=(n_verts,1)).astype(np.float64)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
 
     # Test with several RHS
-    b = np.random.random(size=(32, n_verts)).astype(np.float64).T
+    b = np.random.random(size=(n_verts, 32)).astype(np.float64)
+    b_torch = torch.tensor(b, device='cuda')
+    x_torch = torch.zeros_like(b_torch)
 
-    assert(np.allclose(solver.solve(b), factor.solve_A(b)))
+    solver.solve(b_torch, x_torch)
+
+    assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
