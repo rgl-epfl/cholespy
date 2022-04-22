@@ -56,27 +56,31 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
         })
         // CPU solve
         .def("solve", [](Class &self,
-                        nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cpu, nb::c_contig> b,
-                        nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cpu, nb::c_contig> x){
-            if (b.shape(0) != x.shape(0) || b.shape(1) != x.shape(1))
+                        nb::tensor<Float, nb::device::cpu, nb::c_contig> b,
+                        nb::tensor<Float, nb::device::cpu, nb::c_contig> x){
+            if (b.ndim() != 1 && b.ndim() != 2)
+                throw std::invalid_argument("Expected 1D or 2D tensors as input.");
+            if (b.shape(0) != x.shape(0) || (b.ndim() == 2 && b.shape(1) != x.shape(1)))
                 throw std::invalid_argument("x and b should have the same dimensions.");
 
             if (!self.is_cpu())
                 throw std::invalid_argument("Input device is CPU but the solver was initialized for CUDA.");
 
-            self.solve_cpu(b.shape(1), (Float *) b.data(), (Float *) x.data());
+            self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data());
         })
         // CUDA solve
         .def("solve", [](Class &self,
-                        nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cuda, nb::c_contig> b,
-                        nb::tensor<Float, nb::shape<nb::any, nb::any>, nb::device::cuda, nb::c_contig> x){
-            if (b.shape(0) != x.shape(0) || b.shape(1) != x.shape(1))
+                        nb::tensor<Float, nb::device::cuda, nb::c_contig> b,
+                        nb::tensor<Float, nb::device::cuda, nb::c_contig> x){
+            if (b.ndim() != 1 && b.ndim() != 2)
+                throw std::invalid_argument("Expected 1D or 2D tensors as input.");
+            if (b.shape(0) != x.shape(0) || (b.ndim() == 2 && b.shape(1) != x.shape(1)))
                 throw std::invalid_argument("x and b should have the same dimensions.");
 
             if (self.is_cpu())
                 throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
 
-            self.solve_cuda(b.shape(1), (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
+            self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
         });
 }
 
