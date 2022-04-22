@@ -214,10 +214,9 @@ void CholeskySolver<Float>::factorize(const std::vector<int> &col_ptr, const std
 
     cholmod_start(&m_common);
 
-    m_common.supernodal = CHOLMOD_SIMPLICIAL; // TODO: if using Cholmod to solve, try with supernodal here
+    m_common.supernodal = m_cpu ? CHOLMOD_SUPERNODAL : CHOLMOD_SIMPLICIAL;
     m_common.final_ll = 1; // compute LL' factorization instead of LDL´ (default for simplicial)
     m_common.print = 5; // log level TODO: Remove
-    //TODO: Not sure this is necessary, need to benchmark
     m_common.nmethods = 1;
     m_common.method[0].ordering = CHOLMOD_NESDIS;
 
