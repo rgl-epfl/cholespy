@@ -14,12 +14,18 @@ enum MatrixType {
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(int n_rows, std::vector<int> &ii, std::vector<int> &jj, std::vector<double> &x, MatrixType type);
+    CholeskySolver(int n_rows, std::vector<int> &ii, std::vector<int> &jj, std::vector<double> &x, MatrixType type, bool cpu);
 
     ~CholeskySolver();
 
-    // Solve the whole system using the Cholesky factorization
+    // Solve the whole system using the Cholesky factorization on the GPU
     void solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x);
+
+    // Solve the whole system using the Cholesky factorization on the CPU
+    void solve_cpu(int n_rhs, Float *b, Float *x);
+
+    // Return whether the solver solves on the CPU or on the GPU
+    bool is_cpu() { return m_cpu; };
 
 private:
 
@@ -27,13 +33,22 @@ private:
     void factorize(const std::vector<int> &col_ptr, const std::vector<int> &rows, const std::vector<double> &data);
 
     // Run the analysis of a triangular matrix obtained through Cholesky
-    void analyze(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);
+    void analyze_cuda(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);
 
 	// Solve one triangular system
     void launch_kernel(bool lower, CUdeviceptr x);
 
     int m_nrhs = 0;
     int m_n;
+
+    // CPU or GPU solver?
+    bool m_cpu;
+
+    // Pointers used for the analysis, freed if solving on the GPU, kept if solving on the CPU
+    cholmod_factor *m_factor;
+    cholmod_common m_common;
+
+    // Pointers used for the GPU variant
 
     // Permutation
     CUdeviceptr m_perm_d;
@@ -48,7 +63,7 @@ private:
     CUdeviceptr m_upper_cols_d;
     CUdeviceptr m_upper_data_d;
 
-    // Mask of already processed rows, usesd for both analysis and solve
+    // Mask of already processed rows, used for both analysis and solve
     CUdeviceptr m_processed_rows_d;
 
     // ID of current row being processed by a given block

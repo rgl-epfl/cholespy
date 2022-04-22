@@ -54,7 +54,40 @@ def test_cube_pytorch():
     b = np.random.random(size=(n_verts, 32)).astype(np.float32)
     b_torch = torch.tensor(b, device='cuda')
     x_torch = torch.zeros_like(b_torch)
-
     solver.solve(b_torch, x_torch)
 
     assert(np.allclose(x_torch.cpu().numpy(), factor.solve_A(b)))
+
+
+def test_cube_numpy():
+
+    n_verts = 8
+    lambda_ = 2.0
+
+    faces = np.array([[0, 1, 3],
+                     [0, 3, 2],
+                     [2, 3, 7],
+                     [2, 7, 6],
+                     [4, 5, 7],
+                     [4, 7, 6],
+                     [0, 1, 5],
+                     [0, 5, 4],
+                     [1, 5, 7],
+                     [1, 7, 3],
+                     [0, 4, 6],
+                     [0, 6, 2]])
+
+    values, idx = get_coo_arrays(n_verts, faces, lambda_)
+
+    L_csc = sp.csc_matrix((values, idx))
+    factor = cholmod.cholesky(L_csc, ordering_method='amd', mode='simplicial')
+
+    solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
+
+    np.random.seed(45)
+
+    b = np.random.random(size=(n_verts, 32)).astype(np.float32)
+    x = np.zeros_like(b)
+
+    solver.solve(b, x)
+    assert(np.allclose(x, factor.solve_A(b)))
