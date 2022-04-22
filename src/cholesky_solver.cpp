@@ -249,6 +249,10 @@ void CholeskySolver<Float>::factorize(const std::vector<int> &col_ptr, const std
     m_factor = cholmod_analyze(A, &m_common);
     cholmod_factorize(A, m_factor, &m_common);
 
+    // The previous call sets this flag if it failed
+    if (m_common.status == CHOLMOD_NOT_POSDEF)
+        throw std::invalid_argument("Matrix is not positive definite!");
+
     // Setup GPU solving analysis phase
     if (!m_cpu) {
         // Copy permutation
