@@ -10,7 +10,7 @@ def get_coo_arrays(n_verts, faces, lambda_):
     ii = faces[:, [1, 2, 0]].flatten()
     jj = faces[:, [2, 0, 1]].flatten()
     adj = np.unique(np.stack([np.concatenate([ii, jj]), np.concatenate([jj, ii])], axis=0), axis=1)
-    adj_values = np.ones(adj.shape[1], dtype=np.float) * lambda_
+    adj_values = np.ones(adj.shape[1], dtype=np.float64) * lambda_
 
     # Diagonal indices, duplicated as many times as the connectivity of each index
     diag_idx = np.stack((adj[0], adj[0]), axis=0)
