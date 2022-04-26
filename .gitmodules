@@ -1,0 +1,3 @@
+[submodule "ext/suitesparse-metis-for-windows"]
+	path = ext/suitesparse-metis-for-windows
+	url = git@github.com:bathal1/suitesparse-metis-for-windows.git

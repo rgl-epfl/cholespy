@@ -35,7 +35,9 @@ find_package(nanobind CONFIG REQUIRED)
 # Find CUDA to link to the CUDA Driver API
 find_package(CUDAToolkit REQUIRED)
 # CHOLMOD package
-find_package(SuiteSparse CONFIG REQUIRED)
+add_subdirectory(ext/suitesparse-metis-for-windows)
+include_directories("${suitesparseconfig_SOURCE_DIR}")
+include_directories("${CHOLMOD_SOURCE_DIR}/Include")
 
 add_library(
   cholesky_cuda STATIC
@@ -51,9 +53,8 @@ target_compile_features(cholesky_cuda PRIVATE cxx_std_17)
 
 target_link_libraries(cholesky_cuda
   CUDA::cuda_driver
-  SuiteSparse::cholmod
+  cholmod
 )
-
 
 nanobind_add_module(_cholesky_core NB_STATIC src/main.cpp)
 set_property(TARGET _cholesky_core PROPERTY POSITION_INDEPENDENT_CODE ON)
