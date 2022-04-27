@@ -34,9 +34,9 @@ void initCuda() {
 
     cuda_check(cuInit(0));
     cuda_check(cuDeviceGet(&cu_device, 0));
-    cuda_check(cuCtxGetCurrent(&cu_context));
-    if (!cu_context)
-        cuda_check(cuCtxCreate(&cu_context, 0, cu_device));
+    // TODO: flags?
+    cuda_check(cuDevicePrimaryCtxRetain(&cu_context, cu_device));
+    cuda_check(cuCtxSetCurrent(cu_context));
     cuda_check(cuModuleLoadData(&cu_module, (void *) imageBytes));
     cuda_check(cuModuleGetFunction(&solve_lower_float, cu_module, (char *)"solve_lower_float"));
     cuda_check(cuModuleGetFunction(&solve_lower_double, cu_module, (char *)"solve_lower_double"));
@@ -46,4 +46,6 @@ void initCuda() {
     cuda_check(cuModuleGetFunction(&analysis_upper, cu_module, (char *)"analysis_upper"));
     // Do all this only once
     init = true;
+
+    // TODO: release context ?
 }
