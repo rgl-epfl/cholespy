@@ -7,6 +7,8 @@
 
 void coo_to_csc(int n_rows, const std::vector<int> &coo_i, const std::vector<int> &coo_j, const std::vector<double> &coo_x, std::vector<int> &col_ptr, std::vector<int> &rows, std::vector<double> &data) {
 
+    std::cout << "Warning: received a COO matrix as input. Converting it to CSC." << std::endl;
+
     col_ptr.resize(n_rows+1, 0);
     rows.resize(coo_x.size(), 0);
     data.resize(coo_x.size(), 0);
@@ -52,6 +54,8 @@ void coo_to_csc(int n_rows, const std::vector<int> &coo_i, const std::vector<int
 }
 
 void csr_to_csc(const std::vector<int> &csr_row_ptr, const std::vector<int> &csr_cols, const std::vector<double> &csr_data, std::vector<int> &csc_col_ptr, std::vector<int> &csc_rows, std::vector<double> &csc_data) {
+
+    std::cout << "Warning: received a CSR matrix as input. Converting it to CSC." << std::endl;
 
     int n_rows = csr_row_ptr.size()-1;
 
