@@ -2,6 +2,9 @@ import pytest
 from cholesky import CholeskySolverF, MatrixType
 import numpy as np
 import torch
+import tensorflow as tf
+import jax
+from jax import dlpack
 import drjit
 import sksparse.cholmod as cholmod
 import scipy.sparse as sp
@@ -34,7 +37,6 @@ def test_frameworks():
     b = np.random.random(size=(n_verts, 32)).astype(np.float32)
     x_ref = factor.solve_A(b)
 
-
     # Test with Numpy
     solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
 
@@ -57,6 +59,32 @@ def test_frameworks():
     x_torch = torch.zeros_like(b_torch)
     solver.solve(b_torch, x_torch)
     assert(np.allclose(x_torch.numpy(), x_ref))
+
+    # Test with TensorFlow - CUDA
+    with tf.device('/device:gpu:0'):
+        solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
+
+        b_tf = tf.convert_to_tensor(b)
+        x_tf = tf.zeros_like(b_tf)
+        solver.solve(b_tf, x_tf)
+        assert(np.allclose(x_tf.numpy(), x_ref))
+
+    # Test with TensorFlow - CPU
+    with tf.device('/device:cpu:0'):
+        solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
+
+        b_tf = tf.convert_to_tensor(b)
+        x_tf = tf.zeros_like(b_tf)
+        solver.solve(b_tf, x_tf)
+        assert(np.allclose(x_tf.numpy(), x_ref))
+
+    # Test with JAX
+    solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
+
+    b_jax= jax.numpy.array(b)
+    x_jax = jax.numpy.zeros_like(b_jax)
+    solver.solve(b_jax, x_jax)
+    assert(np.allclose(x_jax, x_ref))
 
     # Test with DrJIT - CUDA
     a = drjit.cuda.TensorXi(idx[0])
