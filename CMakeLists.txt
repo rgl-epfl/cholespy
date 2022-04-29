@@ -8,6 +8,14 @@ if (NOT SKBUILD)
                       "Please run\n$ pip install .")
 endif()
 
+#  Check if submodules have been checked out, or fail early
+if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-windows/cmake")
+  message(FATAL_ERROR "The dependencies are missing! "
+    "You probably did not clone the project with --recursive. It is possible to recover "
+    "by invoking\n$ git submodule update --init --recursive")
+endif()
+
+
 if (SKBUILD)
   # Constrain FindPython to find the Python version used by scikit-build
   set(Python_VERSION "${PYTHON_VERSION_STRING}")
@@ -32,8 +40,6 @@ list(APPEND CMAKE_PREFIX_PATH "${_tmp_dir}")
 
 # Now import nanobind from CMake
 find_package(nanobind CONFIG REQUIRED)
-# Find CUDA to link to the CUDA Driver API
-find_package(CUDAToolkit REQUIRED)
 # CHOLMOD package
 add_subdirectory(ext/suitesparse-metis-for-windows)
 include_directories("${suitesparseconfig_SOURCE_DIR}")
@@ -43,7 +49,7 @@ add_library(
   cholesky_cuda STATIC
 
   kernels/kernels.h
-  src/cuda_setup.h
+  src/cuda_driver.h          src/cuda_driver.cpp
   src/cholesky_solver.h      src/cholesky_solver.cpp
 )
 
@@ -52,7 +58,6 @@ set_property(TARGET cholesky_cuda PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_compile_features(cholesky_cuda PRIVATE cxx_std_17)
 
 target_link_libraries(cholesky_cuda
-  CUDA::cuda_driver
   cholmod
 )
 

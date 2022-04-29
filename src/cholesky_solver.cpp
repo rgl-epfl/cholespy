@@ -1,5 +1,5 @@
 #include "cholesky_solver.h"
-#include "cuda_setup.h"
+#include "cuda_driver.h"
 #include <algorithm>
 #include <exception>
 
@@ -161,8 +161,6 @@ void csc_sum_duplicates(std::vector<int> &col_ptr, std::vector<int> &rows, std::
 template <typename Float>
 CholeskySolver<Float>::CholeskySolver(int n_rows, std::vector<int> &ii, std::vector<int> &jj, std::vector<double> &x, MatrixType type, bool cpu) : m_n(n_rows), m_cpu(cpu) {
 
-    // Initialize CUDA and load the kernels if not already done
-    initCuda();
 
     // Placeholders for the CSC matrix data
     std::vector<int> col_ptr, rows;
@@ -201,11 +199,11 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, std::vector<int> &ii, std::vec
     if (!m_cpu) {
         // Mask of rows already processed
         cuda_check(cuMemAlloc(&m_processed_rows_d, m_n*sizeof(bool)));
-        cuda_check(cuMemsetD8(m_processed_rows_d, 0, m_n)); // Initialize to all false
+        cuda_check(cuMemsetD8Async(m_processed_rows_d, 0, m_n, 0)); // Initialize to all false
 
         // Row id
         cuda_check(cuMemAlloc(&m_stack_id_d, sizeof(int)));
-        cuda_check(cuMemsetD32(m_stack_id_d, 0, 1));
+        cuda_check(cuMemsetD32Async(m_stack_id_d, 0, 1, 0));
     }
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
@@ -261,7 +259,7 @@ void CholeskySolver<Float>::factorize(const std::vector<int> &col_ptr, const std
     if (!m_cpu) {
         // Copy permutation
         cuda_check(cuMemAlloc(&m_perm_d, m_n*sizeof(int)));
-        cuda_check(cuMemcpyHtoDAsync(m_perm_d, m_factor->Perm, m_n*sizeof(int), 0));
+        cuda_check(cuMemcpyAsync(m_perm_d, m_factor->Perm, m_n*sizeof(int), 0));
 
         cholmod_sparse *lower_csc = cholmod_factor_to_sparse(m_factor, &m_common);
         // The transpose of a CSC (resp. CSR) matrix is its CSR (resp. CSC) representation
@@ -322,22 +320,22 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
 
     // CSR Matrix arrays
     cuda_check(cuMemAlloc(rows_d, (1+n_rows)*sizeof(int)));
-    cuda_check(cuMemcpyHtoDAsync(*rows_d, csr_rows, (1+n_rows)*sizeof(int), 0));
+    cuda_check(cuMemcpyAsync(*rows_d, csr_rows, (1+n_rows)*sizeof(int), 0));
     cuda_check(cuMemAlloc(cols_d, n_entries*sizeof(int)));
-    cuda_check(cuMemcpyHtoDAsync(*cols_d, csr_cols, n_entries*sizeof(int), 0));
+    cuda_check(cuMemcpyAsync(*cols_d, csr_cols, n_entries*sizeof(int), 0));
     cuda_check(cuMemAlloc(data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyHtoDAsync(*data_d, csr_data, n_entries*sizeof(Float), 0));
+    cuda_check(cuMemcpyAsync(*data_d, csr_data, n_entries*sizeof(Float), 0));
 
     // Row i belongs in level level_ind[i]
     CUdeviceptr level_ind_d;
     cuda_check(cuMemAlloc(&level_ind_d, n_rows*sizeof(int)));
-    cuda_check(cuMemsetD32(level_ind_d, 0, n_rows));
+    cuda_check(cuMemsetD32Async(level_ind_d, 0, n_rows, 0));
 
-    cuda_check(cuMemsetD8(m_processed_rows_d, 0, n_rows)); // Initialize to all false
+    cuda_check(cuMemsetD8Async(m_processed_rows_d, 0, n_rows, 0)); // Initialize to all false
 
     CUdeviceptr max_lvl_d;
     cuda_check(cuMemAlloc(&max_lvl_d, sizeof(int)));
-    cuda_check(cuMemsetD32(max_lvl_d, 0, 1));
+    cuda_check(cuMemsetD32Async(max_lvl_d, 0, 1, 0));
 
     void *args[6] = {
         &n_rows,
@@ -355,10 +353,10 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
                             0, 0, args, 0));
 
     int *level_ind_h = (int *) malloc(n_rows*sizeof(int));
-    cuda_check(cuMemcpyDtoHAsync(level_ind_h, level_ind_d, n_rows*sizeof(int), 0));
+    cuda_check(cuMemcpyAsync((CUdeviceptr) level_ind_h, level_ind_d, n_rows*sizeof(int), 0));
 
     int max_lvl_h = 0;
-    cuda_check(cuMemcpyDtoHAsync(&max_lvl_h, max_lvl_d, sizeof(int), 0));
+    cuda_check(cuMemcpyAsync((CUdeviceptr) &max_lvl_h, max_lvl_d, sizeof(int), 0));
 
     // Construct the (sorted) level array
 
@@ -387,7 +385,7 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
     }
 
     cuda_check(cuMemAlloc(levels_d, n_rows*sizeof(int)));
-    cuda_check(cuMemcpyHtoDAsync(*levels_d, levels_h, n_rows*sizeof(int), 0));
+    cuda_check(cuMemcpyAsync(*levels_d, levels_h, n_rows*sizeof(int), 0));
 
     // Free useless stuff
     free(levels_h);
@@ -398,8 +396,8 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
 template<typename Float>
 void CholeskySolver<Float>::launch_kernel(bool lower, CUdeviceptr x) {
     // Initialize buffers
-    cuda_check(cuMemsetD8(m_processed_rows_d, 0, m_n)); // Initialize to all false
-    cuda_check(cuMemsetD32(m_stack_id_d, 0, 1));
+    cuda_check(cuMemsetD8Async(m_processed_rows_d, 0, m_n, 0)); // Initialize to all false
+    cuda_check(cuMemsetD32Async(m_stack_id_d, 0, 1, 0));
 
     CUdeviceptr rows_d = (lower ? m_lower_rows_d : m_upper_rows_d);
     CUdeviceptr cols_d = (lower ? m_lower_cols_d : m_upper_cols_d);

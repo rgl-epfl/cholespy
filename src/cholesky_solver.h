@@ -3,7 +3,7 @@
 #include <iostream>
 #include <vector>
 #include "cholmod.h"
-#include <cuda.h>
+#include "cuda_driver.h"
 
 enum MatrixType {
     CSC = 0,

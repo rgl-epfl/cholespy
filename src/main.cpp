@@ -44,13 +44,16 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
                             nb::tensor<double, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> x,
                             MatrixType type){
 
+            // Initialize CUDA and load the kernels if not already done
+            init_cuda();
+
             std::vector<int> indices_a(ii.shape(0));
             std::vector<int> indices_b(jj.shape(0));
             std::vector<double> data(x.shape(0));
 
-            cuda_check(cuMemcpyDtoHAsync(&indices_a[0], (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
-            cuda_check(cuMemcpyDtoHAsync(&indices_b[0], (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
-            cuda_check(cuMemcpyDtoHAsync(&data[0], (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
+            cuda_check(cuMemcpyAsync(&indices_a[0], (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
+            cuda_check(cuMemcpyAsync(&indices_b[0], (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
+            cuda_check(cuMemcpyAsync(&data[0], (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
 
             new (self) Class(n_rows, indices_a, indices_b, data, type, false);
         })
