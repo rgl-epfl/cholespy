@@ -25,16 +25,24 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
                             nb::tensor<double, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> x,
                             MatrixType type){
 
-            std::vector<int> indices_a(ii.shape(0));
-            std::vector<int> indices_b(jj.shape(0));
-            std::vector<double> data(x.shape(0));
+            if (type == MatrixType::COO){
+                if (ii.shape(0) != jj.shape(0))
+                    throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
+                if (ii.shape(0) != x.shape(0))
+                    throw std::invalid_argument("Sparse COO matrix: the index and data arrays should have the same size.");
+            } else if (type == MatrixType::CSR) {
+                if (jj.shape(0) != x.shape(0))
+                    throw std::invalid_argument("Sparse CSR matrix: the column index and data arrays should have the same size.");
+                if (ii.shape(0) != n_rows+1)
+                    throw std::invalid_argument("Sparse CSR matrix: Invalid size for row pointer array.");
+            } else {
+                if (jj.shape(0) != x.shape(0))
+                    throw std::invalid_argument("Sparse CSC matrix: the row index and data arrays should have the same size.");
+                if (ii.shape(0) != n_rows+1)
+                    throw std::invalid_argument("Sparse CSC matrix: Invalid size for column pointer array.");
+            }
 
-            // TODO: Avoid unnecessary copies here
-            std::copy((int *)ii.data(), (int *)ii.data()+ii.shape(0), indices_a.begin());
-            std::copy((int *)jj.data(), (int *)jj.data()+jj.shape(0), indices_b.begin());
-            std::copy((double *)x.data(), (double *)x.data()+x.shape(0), data.begin());
-
-            new (self) Class(n_rows, indices_a, indices_b, data, type, true);
+            new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true);
         })
         // GPU init
         .def("__init__", [](Class *self,
@@ -44,18 +52,39 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
                             nb::tensor<double, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> x,
                             MatrixType type){
 
+            if (type == MatrixType::COO){
+                if (ii.shape(0) != jj.shape(0))
+                    throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
+                if (ii.shape(0) != x.shape(0))
+                    throw std::invalid_argument("Sparse COO matrix: the index and data arrays should have the same size.");
+            } else if (type == MatrixType::CSR) {
+                if (jj.shape(0) != x.shape(0))
+                    throw std::invalid_argument("Sparse CSR matrix: the column index and data arrays should have the same size.");
+                if (ii.shape(0) != n_rows+1)
+                    throw std::invalid_argument("Sparse CSR matrix: Invalid size for row pointer array.");
+            } else {
+                if (jj.shape(0) != x.shape(0))
+                    throw std::invalid_argument("Sparse CSC matrix: the row index and data arrays should have the same size.");
+                if (ii.shape(0) != n_rows+1)
+                    throw std::invalid_argument("Sparse CSC matrix: Invalid size for column pointer array.");
+            }
+
             // Initialize CUDA and load the kernels if not already done
             init_cuda();
 
-            std::vector<int> indices_a(ii.shape(0));
-            std::vector<int> indices_b(jj.shape(0));
-            std::vector<double> data(x.shape(0));
+            int *indices_a = (int *) malloc(ii.shape(0)*sizeof(int));
+            int *indices_b = (int *) malloc(jj.shape(0)*sizeof(int));
+            double *data = (double *) malloc(x.shape(0)*sizeof(double));
 
-            cuda_check(cuMemcpyAsync(&indices_a[0], (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
-            cuda_check(cuMemcpyAsync(&indices_b[0], (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
-            cuda_check(cuMemcpyAsync(&data[0], (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
+            cuda_check(cuMemcpyAsync((CUdeviceptr) indices_a, (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
+            cuda_check(cuMemcpyAsync((CUdeviceptr) indices_b, (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
+            cuda_check(cuMemcpyAsync((CUdeviceptr) data, (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
 
-            new (self) Class(n_rows, indices_a, indices_b, data, type, false);
+            new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false);
+
+            free(indices_a);
+            free(indices_b);
+            free(data);
         })
         // CPU solve
         .def("solve", [](Class &self,

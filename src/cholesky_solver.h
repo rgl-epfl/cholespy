@@ -14,7 +14,7 @@ enum MatrixType {
 template<typename Float>
 class CholeskySolver {
 public:
-    CholeskySolver(int n_rows, std::vector<int> &ii, std::vector<int> &jj, std::vector<double> &x, MatrixType type, bool cpu);
+    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu);
 
     ~CholeskySolver();
 
@@ -30,7 +30,7 @@ public:
 private:
 
     // Factorize the CSC matrix using CHOLMOD
-    void factorize(const std::vector<int> &col_ptr, const std::vector<int> &rows, const std::vector<double> &data);
+    void factorize(int *col_ptr, int *rows, double *data);
 
     // Run the analysis of a triangular matrix obtained through Cholesky
     void analyze_cuda(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);
@@ -40,6 +40,7 @@ private:
 
     int m_nrhs = 0;
     int m_n;
+    int m_nnz;
 
     // CPU or GPU solver?
     bool m_cpu;
