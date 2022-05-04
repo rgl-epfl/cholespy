@@ -47,7 +47,8 @@ private:
 
     // Pointers used for the analysis, freed if solving on the GPU, kept if solving on the CPU
     cholmod_factor *m_factor;
-    cholmod_common m_common;
+    cholmod_dense  *m_tmp_chol = nullptr;
+    cholmod_common  m_common;
 
     // Pointers used for the GPU variant
 

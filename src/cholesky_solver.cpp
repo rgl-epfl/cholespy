@@ -208,9 +208,8 @@ void CholeskySolver<Float>::factorize(int *col_ptr, int *rows, double *data) {
 
     cholmod_start(&m_common);
 
-    m_common.supernodal = m_cpu ? CHOLMOD_SUPERNODAL : CHOLMOD_SIMPLICIAL;
+    m_common.supernodal = CHOLMOD_SIMPLICIAL;
     m_common.final_ll = 1; // compute LL' factorization instead of LDL´ (default for simplicial)
-    m_common.print = 5; // log level TODO: Remove
     m_common.nmethods = 1;
     m_common.method[0].ordering = CHOLMOD_NESDIS;
 
@@ -357,7 +356,6 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
     std::vector<int> level_ptr;
     level_ptr.resize(max_lvl_h + 1, 0);
 
-    // TODO: Try to do some of this on the GPU, or maybe with drjit types?
     // Count the number of rows per level
     for (int i=0; i<n_rows; i++) {
         level_ptr[1+level_ind_h[i]]++;
@@ -424,7 +422,6 @@ void CholeskySolver<Float>::launch_kernel(bool lower, CUdeviceptr x) {
 
 template <typename Float>
 void CholeskySolver<Float>::solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x) {
-    // TODO fallback to cholmod in the CPU array case
     if (n_rhs != m_nrhs) {
         if (n_rhs > 128)
             throw std::invalid_argument("The number of RHS should be less than 128.");
@@ -442,29 +439,34 @@ void CholeskySolver<Float>::solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x) 
 }
 
 template<typename Float>
-void CholeskySolver<Float>::solve_cpu(int nrhs, Float *b, Float *x) {
-    cholmod_dense *cholmod_b = cholmod_allocate_dense(m_n,
-                                                      nrhs,
-                                                      m_n,
-                                                      CHOLMOD_REAL,
-                                                      &m_common
-                                                      );
+void CholeskySolver<Float>::solve_cpu(int n_rhs, Float *b, Float *x) {
 
+    if (n_rhs != m_nrhs) {
+        // We need to modify the allocated memory for the solution
+        if (m_tmp_chol)
+            cholmod_free_dense(&m_tmp_chol, &m_common);
+        m_tmp_chol = cholmod_allocate_dense(m_n,
+                                            n_rhs,
+                                            m_n,
+                                            CHOLMOD_REAL,
+                                            &m_common
+                                            );
+        m_nrhs = n_rhs;
+    }
     // Set cholmod object fields, converting from C style ordering to F style
-    double *tmp = (double *)cholmod_b->x;
+    double *tmp = (double *)m_tmp_chol->x;
     for (int i=0; i<m_n; ++i)
-        for (int j=0; j<nrhs; ++j)
-            tmp[i + j*m_n] = (double) b[i*nrhs + j];
+        for (int j=0; j<n_rhs; ++j)
+            tmp[i + j*m_n] = (double) b[i*n_rhs + j];
 
-    cholmod_dense *cholmod_x = cholmod_solve(CHOLMOD_A, m_factor, cholmod_b, &m_common);
+    cholmod_dense *cholmod_x = cholmod_solve(CHOLMOD_A, m_factor, m_tmp_chol, &m_common);
 
     double *sol = (double *) cholmod_x->x;
     for (int i=0; i<m_n; ++i)
-        for (int j=0; j<nrhs; ++j)
-            x[i*nrhs + j] = (Float) sol[i + j*m_n];
+        for (int j=0; j<n_rhs; ++j)
+            x[i*n_rhs + j] = (Float) sol[i + j*m_n];
 
     cholmod_free_dense(&cholmod_x, &m_common);
-    cholmod_free_dense(&cholmod_b, &m_common);
 }
 
 template <typename Float>
