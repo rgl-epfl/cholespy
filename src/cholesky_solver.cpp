@@ -181,7 +181,6 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, dou
     // CHOLMOD expects a CSC matrix without duplicate entries, so we sum them:
     csc_sort_indices(n_rows, nnz, col_ptr, rows, data);
     csc_sum_duplicates(n_rows, m_nnz, &col_ptr, &rows, &data);
-
     if (!m_cpu) {
         // Mask of rows already processed
         cuda_check(cuMemAlloc(&m_processed_rows_d, m_n*sizeof(bool)));
@@ -348,21 +347,18 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
 
     int max_lvl_h = 0;
     cuda_check(cuMemcpyAsync((CUdeviceptr) &max_lvl_h, max_lvl_d, sizeof(int), 0));
+    int n_levels = max_lvl_h + 1;
 
     // Construct the (sorted) level array
-
     int *levels_h = (int *) malloc(n_rows*sizeof(int));
-
-    std::vector<int> level_ptr;
-    level_ptr.resize(max_lvl_h + 1, 0);
-
+    std::vector<int> level_ptr(n_levels + 1, 0);
     // Count the number of rows per level
     for (int i=0; i<n_rows; i++) {
         level_ptr[1+level_ind_h[i]]++;
     }
 
     // Convert into the list of pointers to the start of each level
-    for (int i=0, S=0; i<max_lvl_h; i++){
+    for (int i=0, S=0; i<n_levels; i++){
         S += level_ptr[i+1];
         level_ptr[i+1] = S;
     }
