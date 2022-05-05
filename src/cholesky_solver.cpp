@@ -7,7 +7,7 @@
 
 void coo_to_csc(int n_rows, int nnz, const int *coo_i, const int *coo_j, const double *coo_x, int *csc_col_ptr, int *csc_rows, double *csc_data) {
 
-    std::cout << "Warning: received a COO matrix as input. Converting it to CSC." << std::endl;
+    std::cerr << "Warning: received a COO matrix as input. Converting it to CSC." << std::endl;
 
     // Count non zero entries per column
     for (int i=0; i<nnz; ++i) {
@@ -51,7 +51,7 @@ void coo_to_csc(int n_rows, int nnz, const int *coo_i, const int *coo_j, const d
 
 void csr_to_csc(int n_rows, int nnz, const int *csr_row_ptr, const int *csr_cols, const double *csr_data, int *csc_col_ptr, int *csc_rows, double *csc_data) {
 
-    std::cout << "Warning: received a CSR matrix as input. Converting it to CSC." << std::endl;
+    std::cerr << "Warning: received a CSR matrix as input. Converting it to CSC." << std::endl;
 
     // Count non zero entries per column
     for (int i=0; i<nnz; ++i) {
