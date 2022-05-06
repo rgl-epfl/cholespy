@@ -19,7 +19,7 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
     nb::class_<Class>(m, class_name.c_str())
         // CPU init
         .def("__init__", [](Class *self,
-                            uint n_rows,
+                            uint32_t n_rows,
                             nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> ii,
                             nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> jj,
                             nb::tensor<double, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> x,
@@ -46,7 +46,7 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
         })
         // GPU init
         .def("__init__", [](Class *self,
-                            uint n_rows,
+                            uint32_t n_rows,
                             nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> ii,
                             nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> jj,
                             nb::tensor<double, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> x,
