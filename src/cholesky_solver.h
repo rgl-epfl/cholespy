@@ -11,9 +11,28 @@ enum MatrixType {
     COO
 };
 
+/**
+ * Cholesky Solver Class
+ *
+ * Takes as in put an arbitrary COO, CSC or CSR matrix, and factorizes it using
+ * CHOLMOD. If it receives CUDA arrays as input, it runs an analysis of the
+ * factor on the GPU for faster, parallel solving of the triangular system in
+ * the solving phase.
+ */
 template<typename Float>
 class CholeskySolver {
 public:
+    /**
+     * Build the solver
+     *
+     * @param n_rows The number of rows in the matrix
+     * @param nnz The number of nonzero entries
+     * @param ii Array of row indices if type==COO, column (resp. row) pointer array if type==CSC (resp. CSR)
+     * @param ii Array of row indices if type==COO or CSC, column indices if type==CSR
+     * @param x Array of nonzero entries
+     * @param type The type of the matrix representation. Can be COO, CSC or CSR
+     * @param cpu Whether or not to run the CPU version of the solver.
+     */
     CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu);
 
     ~CholeskySolver();
