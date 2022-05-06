@@ -13,14 +13,14 @@ except ImportError:
 from setuptools import find_packages
 
 setup(
-    name="cholesky",
+    name="cholespy",
     version="0.1.0",
-    description="A triangular backsubstitution solver",
+    description="A self-contained sparse Cholesky solver, compatible with CPU and GPU tensor frameworks.",
     author="Baptiste Nicolet",
     license="BSD",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
-    cmake_install_dir="src/cholesky",
+    cmake_install_dir="src/cholespy",
     include_package_data=True,
     python_requires=">=3.8",
 )

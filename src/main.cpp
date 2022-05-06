@@ -116,7 +116,7 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
         });
 }
 
-NB_MODULE(_cholesky_core, m) {
+NB_MODULE(_cholespy_core, m) {
 
     nb::enum_<MatrixType>(m, "MatrixType")
         .value("CSC", MatrixType::CSC)

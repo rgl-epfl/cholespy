@@ -1,5 +1,5 @@
 import pytest
-from cholesky import CholeskySolverD, CholeskySolverF, MatrixType
+from cholespy import CholeskySolverD, CholeskySolverF, MatrixType
 import numpy as np
 import scipy.sparse as sp
 from scipy.sparse.linalg import spsolve

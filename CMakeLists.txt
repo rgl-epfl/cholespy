@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17...3.22)
 
-project(cholesky LANGUAGES CXX C VERSION "0.1.0")
+project(cholespy LANGUAGES CXX C VERSION "0.1.0")
 
 # Nanobind setup from https://github.com/wjakob/nanobind_example/blob/master/CMakeLists.txt
 if (NOT SKBUILD)
@@ -45,28 +45,18 @@ add_subdirectory(ext/suitesparse-metis-for-windows)
 include_directories("${suitesparseconfig_SOURCE_DIR}")
 include_directories("${CHOLMOD_SOURCE_DIR}/Include")
 
-add_library(
-  cholesky_cuda STATIC
+nanobind_add_module(
+  _cholespy_core NB_STATIC
 
   kernels/kernels.h
   src/cuda_driver.h          src/cuda_driver.cpp
   src/cholesky_solver.h      src/cholesky_solver.cpp
-)
+  src/main.cpp)
 
-set_property(TARGET cholesky_cuda PROPERTY POSITION_INDEPENDENT_CODE ON)
-# set_property(TARGET cholesky_cuda PROPERTY CXX_STANDARD "17")
-target_compile_features(cholesky_cuda PRIVATE cxx_std_17)
+set_property(TARGET _cholespy_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+target_compile_features(_cholespy_core PRIVATE cxx_std_17)
+target_link_libraries(_cholespy_core PUBLIC cholmod)
 
-target_link_libraries(cholesky_cuda
-  cholmod
-)
+target_compile_definitions(_cholespy_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 
-nanobind_add_module(_cholesky_core NB_STATIC src/main.cpp)
-set_property(TARGET _cholesky_core PROPERTY POSITION_INDEPENDENT_CODE ON)
-target_compile_features(_cholesky_core PRIVATE cxx_std_17)
-target_link_libraries(_cholesky_core PUBLIC cholesky_cuda)
-
-#target_include_directories(_cholesky_core PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES} ${CUDA_INCLUDE_DIRS})
-target_compile_definitions(_cholesky_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
-
-install(TARGETS _cholesky_core LIBRARY DESTINATION .)
+install(TARGETS _cholespy_core LIBRARY DESTINATION .)
