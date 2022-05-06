@@ -6,10 +6,11 @@ pipeline.
 
 Under the hood, it relies on CHOLMOD for sparse matrix factorization. For the
 solving phase, it uses CHOLMOD for the CPU version, and uses the result of an
-analysis step run *once* when building the solver for fast solving on the GPU [[1]](#references).
+analysis step run *once* when building the solver for fast solving on the GPU
+[[1]](#references).
 
-It achieves comparrable performance as other frameworks, without the annoying
-dependencies.
+It achieves comparrable performance as other frameworks, with the dependencies
+nicely shipped along.
 
 ![Benchmark](tests/benchmark.jpg)
 
@@ -20,7 +21,7 @@ interoperable with most tensor frameworks (Numpy, PyTorch, JAX...)
 # Installing
 
 ```bash
-pip install cholesky
+pip install cholespy
 ```
 
 # Documentation
@@ -38,7 +39,7 @@ manual conversion.
 Since both variants have the same signature, we only detail `CholeskySolverF`
 below:
 
-**`cholesky.CholeskySolverF(n_rows, ii, jj, x, type)`**
+**`cholespy.CholeskySolverF(n_rows, ii, jj, x, type)`**
 
 **Parameters:**
 - `n_rows` - The number of rows in the (sparse) matrix.
@@ -54,7 +55,7 @@ below:
 - `type` - The matrix representation type, of type `MatrixType`. Available types
   are `MatrixType.COO`, `MatrixType.CSC` and `MatrixType.CSR`.
 
-**`cholesky.CholeskySolverF.solve(b, x)`**
+**`cholespy.CholeskySolverF.solve(b, x)`**
 
 **Parameters**
 - `b` - Right-hand side of the equation to solve. Can be a vector or a matrix.
@@ -67,7 +68,7 @@ below:
 # Example usage
 
 ```python
-from cholesky import CholeskySolverF, MatrixType
+from cholespy import CholeskySolverF, MatrixType
 import torch
 
 # Identity matrix
