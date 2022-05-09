@@ -418,6 +418,7 @@ void CholeskySolver<Float>::launch_kernel(bool lower, CUdeviceptr x) {
 
 template <typename Float>
 void CholeskySolver<Float>::solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x) {
+
     if (n_rhs != m_nrhs) {
         if (n_rhs > 128)
             throw std::invalid_argument("The number of RHS should be less than 128.");
@@ -471,6 +472,8 @@ CholeskySolver<Float>::~CholeskySolver() {
         cholmod_free_factor(&m_factor, &m_common);
         cholmod_finish(&m_common);
     } else {
+        scoped_set_context guard(cu_context);
+
         cuda_check(cuMemFree(m_processed_rows_d));
         cuda_check(cuMemFree(m_stack_id_d));
         cuda_check(cuMemFree(m_perm_d));
