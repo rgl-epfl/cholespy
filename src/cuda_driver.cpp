@@ -124,9 +124,14 @@ bool init_cuda() {
 }
 
 void shutdown_cuda() {
-    //TODO: call this somewhere and pop current
     if (!handle)
         return;
 
+#if defined(_WIN32)
+    FreeLibrary((HMODULE) handle);
+#elif defined(__APPLE__)
+    handle = nullptr;
+#else
     dlclose(handle);
+#endif
 }
