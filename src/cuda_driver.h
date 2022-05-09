@@ -50,3 +50,12 @@ extern CUfunction analysis_upper;
 extern bool init_cuda();
 extern void shutdown_cuda();
 extern void cuda_check_impl(CUresult errval, const char *file, const int line);
+
+struct scoped_set_context {
+    scoped_set_context(CUcontext ctx) {
+        cuda_check(cuCtxPushCurrent(ctx));
+    }
+    ~scoped_set_context() {
+        cuda_check(cuCtxPopCurrent(nullptr));
+    }
+};

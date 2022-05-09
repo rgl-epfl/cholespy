@@ -72,6 +72,8 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
             // Initialize CUDA and load the kernels if not already done
             init_cuda();
 
+            scoped_set_context guard(cu_context);
+
             int *indices_a = (int *) malloc(ii.shape(0)*sizeof(int));
             int *indices_b = (int *) malloc(jj.shape(0)*sizeof(int));
             double *data = (double *) malloc(x.shape(0)*sizeof(double));
@@ -112,6 +114,8 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
             if (self.is_cpu())
                 throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
 
+            scoped_set_context guard(cu_context);
+
             self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
         });
 }
@@ -125,6 +129,15 @@ NB_MODULE(_cholespy_core, m) {
 
     declare_cholesky<float>(m, "F");
     declare_cholesky<double>(m, "D");
+
+    // Custom object to gracefully shutdown CUDA when unloading the module
+    nb::detail::keep_alive(
+        m.ptr(),
+        (void *) 1, // Unused payload
+        [](void *p) noexcept {
+            shutdown_cuda();
+            }
+    );
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
