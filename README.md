@@ -9,7 +9,7 @@ solving phase, it uses CHOLMOD for the CPU version, and uses the result of an
 analysis step run *once* when building the solver for fast solving on the GPU
 [[1]](#references).
 
-It achieves comparrable performance as other frameworks, with the dependencies
+It achieves comparable performance as other frameworks, with the dependencies
 nicely shipped along.
 
 ![Benchmark](tests/benchmark.jpg)
@@ -20,8 +20,17 @@ interoperable with most tensor frameworks (Numpy, PyTorch, JAX...)
 
 # Installing
 
+## With PyPI (recommended)
+
 ```bash
 pip install cholespy
+```
+
+## From source
+
+```bash
+git clone --recursive https://github.com/rgl-epfl/cholespy
+pip install ./cholespy
 ```
 
 # Documentation
@@ -64,6 +73,10 @@ below:
   arrays, then the maximum supported value for `n_rhs` is `128`.
 - `x` - Placeholder for the solution. It must be on the same device and have the
   same shape as `b`.
+
+`x` and `b` **must** have the same dtype as the solver used, i.e. `float32` for
+`CholeskySolverF` or `float64` for `CholeskySolver64`. Since `x` is modified in
+place, implicit type conversion is not supported.
 
 # Example usage
 
