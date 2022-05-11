@@ -88,37 +88,33 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
             free(indices_b);
             free(data);
         })
-        // CPU solve
         .def("solve", [](Class &self,
-                        nb::tensor<Float, nb::device::cpu, nb::c_contig> b,
-                        nb::tensor<Float, nb::device::cpu, nb::c_contig> x){
+                        nb::tensor<Float, nb::c_contig> b,
+                        nb::tensor<Float, nb::c_contig> x){
             if (b.ndim() != 1 && b.ndim() != 2)
                 throw std::invalid_argument("Expected 1D or 2D tensors as input.");
             if (b.shape(0) != x.shape(0) || (b.ndim() == 2 && b.shape(1) != x.shape(1)))
                 throw std::invalid_argument("x and b should have the same dimensions.");
+            if (b.device_type() != x.device_type())
+                throw std::invalid_argument("x and b should be on the same device.");
 
-            if (!self.is_cpu())
-                throw std::invalid_argument("Input device is CPU but the solver was initialized for CUDA.");
+            // CPU solve
+            if (b.device_type() == nb::device::cpu::value) {
+                if (!self.is_cpu())
+                    throw std::invalid_argument("Input device is CPU but the solver was initialized for CUDA.");
 
-            self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data());
-        },
-        nb::arg("b").noconvert(),
-        nb::arg("x").noconvert())
-        // CUDA solve
-        .def("solve", [](Class &self,
-                        nb::tensor<Float, nb::device::cuda, nb::c_contig> b,
-                        nb::tensor<Float, nb::device::cuda, nb::c_contig> x){
-            if (b.ndim() != 1 && b.ndim() != 2)
-                throw std::invalid_argument("Expected 1D or 2D tensors as input.");
-            if (b.shape(0) != x.shape(0) || (b.ndim() == 2 && b.shape(1) != x.shape(1)))
-                throw std::invalid_argument("x and b should have the same dimensions.");
+                self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data());
+            }
+            // CUDA solve
+            else if (b.device_type() == nb::device::cuda::value) {
+                if (self.is_cpu())
+                    throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
 
-            if (self.is_cpu())
-                throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
-
-            scoped_set_context guard(cu_context);
-
-            self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
+                scoped_set_context guard(cu_context);
+                self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
+            }
+            else
+                throw std::invalid_argument("Unsupported input device! Only CPU and CUDA arrays are supported.");
         },
         nb::arg("b").noconvert(),
         nb::arg("x").noconvert());
