@@ -15,6 +15,10 @@ def test_solver(device, variant, n_verts, faces):
         import torch
     except ModuleNotFoundError:
         pytest.skip("PyTorch was not found!")
+
+    if device=='cuda' and torch.cuda.device_count() == 0:
+        pytest.skip("No GPU found.")
+
     np.random.seed(45)
     CholeskySolver = CholeskySolverF if variant == "float" else CholeskySolverD
     dtype = np.float32 if variant == "float" else np.float64
@@ -45,6 +49,10 @@ def test_matrices(device):
         import torch
     except ModuleNotFoundError:
         pytest.skip("PyTorch was not found!")
+
+    if device=='cuda' and torch.cuda.device_count() == 0:
+        pytest.skip("No GPU found.")
+
     np.random.seed(45)
     lambda_ = 2.0
     n_verts, faces = get_cube()
@@ -106,15 +114,6 @@ def test_frameworks(framework):
 
     elif framework == "torch":
         import torch
-        # Test with PyTorch - CUDA
-        # TODO: skip if no GPU
-        solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
-
-        b_torch = torch.tensor(b, device='cuda')
-        x_torch = torch.zeros_like(b_torch)
-        solver.solve(b_torch, x_torch)
-        assert(np.allclose(x_torch.cpu().numpy(), x_ref))
-
         # Test with PyTorch - CPU
         solver = CholeskySolverF(n_verts, torch.tensor(idx[0]), torch.tensor(idx[1]), torch.tensor(values), MatrixType.COO)
 
@@ -123,17 +122,21 @@ def test_frameworks(framework):
         solver.solve(b_torch, x_torch)
         assert(np.allclose(x_torch.numpy(), x_ref))
 
+        # Test with PyTorch - CUDA
+        if torch.cuda.device_count() > 0:
+            solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
+
+            b_torch = torch.tensor(b, device='cuda')
+            x_torch = torch.zeros_like(b_torch)
+            solver.solve(b_torch, x_torch)
+            assert(np.allclose(x_torch.cpu().numpy(), x_ref))
+
     elif framework == "tensorflow":
         import tensorflow as tf
-        # Test with TensorFlow - CUDA
-        with tf.device('/device:gpu:0'):
-            solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
-
-            b_tf = tf.convert_to_tensor(b)
-            x_tf = tf.zeros_like(b_tf)
-            solver.solve(b_tf, x_tf)
-            assert(np.allclose(x_tf.numpy(), x_ref))
-
+        gpus = tf.config.experimental.list_physical_devices('GPU')
+        # Prevent TF from allocating all GPU mrmory for itself
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
         # Test with TensorFlow - CPU
         with tf.device('/device:cpu:0'):
             solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
@@ -143,7 +146,20 @@ def test_frameworks(framework):
             solver.solve(b_tf, x_tf)
             assert(np.allclose(x_tf.numpy(), x_ref))
 
+        if len(gpus) > 0:
+            # Test with TensorFlow - CUDA
+            with tf.device('/device:gpu:0'):
+                solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
+
+                b_tf = tf.convert_to_tensor(b)
+                x_tf = tf.zeros_like(b_tf)
+                solver.solve(b_tf, x_tf)
+                assert(np.allclose(x_tf.numpy(), x_ref))
+
     elif framework == "jax":
+        import os
+        # Prevent JAX from allocating all GPU mrmory for itself
+        os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = "false"
         import jax
         # Test with JAX
         solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
