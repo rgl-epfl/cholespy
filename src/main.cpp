@@ -101,7 +101,9 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
                 throw std::invalid_argument("Input device is CPU but the solver was initialized for CUDA.");
 
             self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data());
-        })
+        },
+        nb::arg("b").noconvert(),
+        nb::arg("x").noconvert())
         // CUDA solve
         .def("solve", [](Class &self,
                         nb::tensor<Float, nb::device::cuda, nb::c_contig> b,
@@ -117,7 +119,9 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
             scoped_set_context guard(cu_context);
 
             self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
-        });
+        },
+        nb::arg("b").noconvert(),
+        nb::arg("x").noconvert());
 }
 
 NB_MODULE(_cholespy_core, m) {
