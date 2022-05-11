@@ -161,13 +161,14 @@ def test_frameworks(framework):
         # Prevent JAX from allocating all GPU mrmory for itself
         os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = "false"
         import jax
-        # Test with JAX
-        solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
+        with jax.experimental.enable_x64():
+            # Test with JAX
+            solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
 
-        b_jax= jax.numpy.array(b)
-        x_jax = jax.numpy.zeros_like(b_jax)
-        solver.solve(b_jax, x_jax)
-        assert(np.allclose(x_jax, x_ref))
+            b_jax= jax.numpy.array(b)
+            x_jax = jax.numpy.zeros_like(b_jax)
+            solver.solve(b_jax, x_jax)
+            assert(np.allclose(x_jax, x_ref))
 
     elif framework == "cupy":
         import cupy as cp
