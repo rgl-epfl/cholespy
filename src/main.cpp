@@ -120,7 +120,10 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
         nb::arg("x").noconvert());
 }
 
-NB_MODULE(_cholespy_core, m) {
+NB_MODULE(_cholespy_core, m_) {
+    (void) m_;
+
+    nb::module_ m = nb::module_::import_("cholespy");
 
     nb::enum_<MatrixType>(m, "MatrixType")
         .value("CSC", MatrixType::CSC)
@@ -131,13 +134,9 @@ NB_MODULE(_cholespy_core, m) {
     declare_cholesky<double>(m, "D");
 
     // Custom object to gracefully shutdown CUDA when unloading the module
-    nb::detail::keep_alive(
-        m.ptr(),
-        (void *) 1, // Unused payload
-        [](void *p) noexcept {
-            shutdown_cuda();
-            }
-    );
+    nb::detail::keep_alive(m.ptr(),
+                           (void *) 1, // Unused payload
+                           [](void *p) noexcept { shutdown_cuda(); });
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
