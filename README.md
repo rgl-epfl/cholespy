@@ -4,10 +4,18 @@ This is a minimalistic, self-contained sparse Cholesky solver, supporting
 solving both on the CPU and on the GPU, easily integrable in your tensor
 pipeline.
 
+When we were working on our "Large Steps in Inverse Rendering of Geometry" paper
+[[1]](#references), we found it quite challenging to hook up an existing sparse
+linear solver to our pipeline, and we managed to do so by adding dependencies on
+large projects (i.e. `cusparse` and `scikit-sparse`), only to use a small part
+of its functionality. Therefore, we decided to implement our own library, that
+serves one purpose: efficiently solving sparse linear systems on the GPU or CPU,
+using a Cholesky factorization.
+
 Under the hood, it relies on CHOLMOD for sparse matrix factorization. For the
 solving phase, it uses CHOLMOD for the CPU version, and uses the result of an
 analysis step run *once* when building the solver for fast solving on the GPU
-[[1]](#references).
+[[2]](#references).
 
 It achieves comparable performance as other frameworks, with the dependencies
 nicely shipped along.
@@ -17,6 +25,7 @@ nicely shipped along.
 The Python bindings are generated with
 [nanobind](https://github.com/wjakob/nanobind), which makes it easily
 interoperable with most tensor frameworks (Numpy, PyTorch, JAX...)
+
 
 # Installing
 
@@ -101,4 +110,6 @@ solver.solve(b, x)
 
 # References
 
-[1] Naumov, M. (2011). Parallel solution of sparse triangular linear systems in the preconditioned iterative methods on the GPU. NVIDIA Corp., Westford, MA, USA, Tech. Rep. NVR-2011, 1.
+[1] Nicolet, B., Jacobson, A., & Jakob, W. (2021). Large steps in inverse rendering of geometry. ACM Transactions on Graphics (TOG), 40(6), 1-13.
+
+[2] Naumov, M. (2011). Parallel solution of sparse triangular linear systems in the preconditioned iterative methods on the GPU. NVIDIA Corp., Westford, MA, USA, Tech. Rep. NVR-2011, 1.
