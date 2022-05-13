@@ -60,3 +60,9 @@ target_link_libraries(_cholespy_core PUBLIC cholmod)
 target_compile_definitions(_cholespy_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 
 install(TARGETS _cholespy_core LIBRARY DESTINATION .)
+
+if (WIN32)
+  file(GLOB SUITESPARSE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-windows/lapack_windows/x64/*.dll)
+  message(STATUS ${SUITESPARSE_FILES})
+  install(FILES ${SUITESPARSE_FILES} DESTINATION .)
+endif()
