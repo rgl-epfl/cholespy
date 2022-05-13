@@ -6,7 +6,6 @@ on:
   push:
     branches:
      - main
-     - wheels
   release:
     types:
       - published
@@ -66,7 +65,6 @@ jobs:
       with:
         path: wheelhouse/*.whl
 
-
   upload_all:
     name: Upload if release
     needs: [build_wheels, build_sdist]
@@ -80,3 +78,8 @@ jobs:
       with:
         name: artifact
         path: dist
+
+    - uses: pypa/gh-action-pypi-publish@v1.4.2
+      with:
+        user: __token__
+        password: ${{ secrets.pypi_password }}
