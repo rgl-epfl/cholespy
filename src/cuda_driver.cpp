@@ -127,11 +127,11 @@ void shutdown_cuda() {
     if (!handle)
         return;
 
+    cuda_check(cuDevicePrimaryCtxRelease(cu_device));
+
 #if defined(_WIN32)
     FreeLibrary((HMODULE) handle);
-#elif defined(__APPLE__)
-    handle = nullptr;
-#else
+#elif !defined(__APPLE__)
     dlclose(handle);
 #endif
 }
