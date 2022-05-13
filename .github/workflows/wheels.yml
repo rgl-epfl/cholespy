@@ -14,8 +14,13 @@ on:
 env:
   CIBW_TEST_COMMAND: pytest {project}/tests
   CIBW_TEST_REQUIRES: pytest numpy scipy
-  CIBW_SKIP: "*-win32 *_i686 pp* *-musllinux*" # Skip PyPy, 32-bit builds, musl linux
+  CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+  CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
+  CIBW_SKIP: "*-win32 *_i686 pp* *-musllinux* cp38-macosx_arm64" # Skip PyPy, 32-bit builds, musl linux
   CIBW_BEFORE_ALL_LINUX: "yum install -y lapack-devel"
+  CIBW_ARCHS_WINDOWS: auto64
+  CIBW_ARCHS_LINUX: auto64
+  CIBW_ARCHS_MACOS: x86_64 arm64
   CIBW_ENVIRONMENT_MACOS: MACOSX_DEPLOYMENT_TARGET=10.14
 
 jobs:
