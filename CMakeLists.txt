@@ -51,7 +51,7 @@ nanobind_add_module(
   kernels/kernels.h
   src/cuda_driver.h          src/cuda_driver.cpp
   src/cholesky_solver.h      src/cholesky_solver.cpp
-  src/main.cpp)
+  src/docstr.h               src/main.cpp)
 
 set_property(TARGET _cholespy_core PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_compile_features(_cholespy_core PRIVATE cxx_std_17)

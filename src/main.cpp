@@ -1,4 +1,5 @@
 #include "cholesky_solver.h"
+#include "docstr.h"
 #include <nanobind/nanobind.h>
 #include <nanobind/tensor.h>
 
@@ -13,17 +14,16 @@ namespace nb = nanobind;
 // void cuda_check_impl(CUresult errval, const char *file, const int line);
 
 template <typename Float>
-void declare_cholesky(nb::module_ &m, std::string typestr) {
+void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *docstr) {
     using Class = CholeskySolver<Float>;
     std::string class_name = std::string("CholeskySolver") + typestr;
-    nb::class_<Class>(m, class_name.c_str())
-        // CPU init
+    nb::class_<Class>(m, class_name.c_str(), docstr)
         .def("__init__", [](Class *self,
                             uint32_t n_rows,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> ii,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> jj,
-                            nb::tensor<double, nb::shape<nb::any>, nb::device::cpu, nb::c_contig> x,
-                            MatrixType type){
+                            nb::tensor<int32_t, nb::shape<nb::any>, nb::c_contig> ii,
+                            nb::tensor<int32_t, nb::shape<nb::any>, nb::c_contig> jj,
+                            nb::tensor<double, nb::shape<nb::any>, nb::c_contig> x,
+                            MatrixType type) {
 
             if (type == MatrixType::COO){
                 if (ii.shape(0) != jj.shape(0))
@@ -41,53 +41,42 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
                 if (ii.shape(0) != n_rows+1)
                     throw std::invalid_argument("Sparse CSC matrix: Invalid size for column pointer array.");
             }
+            if (ii.device_type() != jj.device_type() || ii.device_type() != x.device_type())
+                throw std::invalid_argument("All input tensors should be on the same device!");
 
-            new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true);
-        })
-        // GPU init
-        .def("__init__", [](Class *self,
-                            uint32_t n_rows,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> ii,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> jj,
-                            nb::tensor<double, nb::shape<nb::any>, nb::device::cuda, nb::c_contig> x,
-                            MatrixType type){
+            if (ii.device_type() == nb::device::cuda::value) {
+                // GPU init
 
-            if (type == MatrixType::COO){
-                if (ii.shape(0) != jj.shape(0))
-                    throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
-                if (ii.shape(0) != x.shape(0))
-                    throw std::invalid_argument("Sparse COO matrix: the index and data arrays should have the same size.");
-            } else if (type == MatrixType::CSR) {
-                if (jj.shape(0) != x.shape(0))
-                    throw std::invalid_argument("Sparse CSR matrix: the column index and data arrays should have the same size.");
-                if (ii.shape(0) != n_rows+1)
-                    throw std::invalid_argument("Sparse CSR matrix: Invalid size for row pointer array.");
-            } else {
-                if (jj.shape(0) != x.shape(0))
-                    throw std::invalid_argument("Sparse CSC matrix: the row index and data arrays should have the same size.");
-                if (ii.shape(0) != n_rows+1)
-                    throw std::invalid_argument("Sparse CSC matrix: Invalid size for column pointer array.");
-            }
+                // Initialize CUDA and load the kernels if not already done
+                init_cuda();
 
-            // Initialize CUDA and load the kernels if not already done
-            init_cuda();
+                scoped_set_context guard(cu_context);
 
-            scoped_set_context guard(cu_context);
+                int *indices_a = (int *) malloc(ii.shape(0)*sizeof(int));
+                int *indices_b = (int *) malloc(jj.shape(0)*sizeof(int));
+                double *data = (double *) malloc(x.shape(0)*sizeof(double));
 
-            int *indices_a = (int *) malloc(ii.shape(0)*sizeof(int));
-            int *indices_b = (int *) malloc(jj.shape(0)*sizeof(int));
-            double *data = (double *) malloc(x.shape(0)*sizeof(double));
+                cuda_check(cuMemcpyAsync((CUdeviceptr) indices_a, (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
+                cuda_check(cuMemcpyAsync((CUdeviceptr) indices_b, (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
+                cuda_check(cuMemcpyAsync((CUdeviceptr) data, (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
 
-            cuda_check(cuMemcpyAsync((CUdeviceptr) indices_a, (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
-            cuda_check(cuMemcpyAsync((CUdeviceptr) indices_b, (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
-            cuda_check(cuMemcpyAsync((CUdeviceptr) data, (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
+                new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false);
 
-            new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false);
-
-            free(indices_a);
-            free(indices_b);
-            free(data);
-        })
+                free(indices_a);
+                free(indices_b);
+                free(data);
+            } else if (ii.device_type() == nb::device::cpu::value) {
+                // CPU init
+                new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true);
+            } else
+                throw std::invalid_argument("Unsupported input device! Only CPU and CUDA arrays are supported.");
+        },
+        nb::arg("n_rows"),
+        nb::arg("ii"),
+        nb::arg("jj"),
+        nb::arg("x"),
+        nb::arg("type"),
+        doc_constructor)
         .def("solve", [](Class &self,
                         nb::tensor<Float, nb::c_contig> b,
                         nb::tensor<Float, nb::c_contig> x){
@@ -117,7 +106,8 @@ void declare_cholesky(nb::module_ &m, std::string typestr) {
                 throw std::invalid_argument("Unsupported input device! Only CPU and CUDA arrays are supported.");
         },
         nb::arg("b").noconvert(),
-        nb::arg("x").noconvert());
+        nb::arg("x").noconvert(),
+        doc_solve);
 }
 
 NB_MODULE(_cholespy_core, m_) {
@@ -125,13 +115,13 @@ NB_MODULE(_cholespy_core, m_) {
 
     nb::module_ m = nb::module_::import_("cholespy");
 
-    nb::enum_<MatrixType>(m, "MatrixType")
+    nb::enum_<MatrixType>(m, "MatrixType", doc_matrix_type)
         .value("CSC", MatrixType::CSC)
         .value("CSR", MatrixType::CSR)
         .value("COO", MatrixType::COO);
 
-    declare_cholesky<float>(m, "F");
-    declare_cholesky<double>(m, "D");
+    declare_cholesky<float>(m, "F", doc_cholesky_f);
+    declare_cholesky<double>(m, "D", doc_cholesky_d);
 
     // Custom object to gracefully shutdown CUDA when unloading the module
     nb::detail::keep_alive(m.ptr(),
