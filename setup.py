@@ -23,4 +23,5 @@ setup(
     cmake_install_dir="src/cholespy",
     include_package_data=True,
     python_requires=">=3.8",
+    long_description_content_type="text/markdown"
 )

@@ -60,6 +60,9 @@ jobs:
       run: git diff --exit-code
       shell: bash
 
+    - name: Check metadata
+      run: pipx run twine check wheelhouse/*
+
     - name: Upload wheels
       uses: actions/upload-artifact@v2
       with:
