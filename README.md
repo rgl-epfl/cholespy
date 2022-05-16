@@ -20,7 +20,7 @@ analysis step run *once* when building the solver for fast solving on the GPU
 It achieves comparable performance as other frameworks, with the dependencies
 nicely shipped along.
 
-![Benchmark](tests/benchmark.jpg)
+![Benchmark](https://raw.githubusercontent.com/rgl-epfl/cholespy/main/tests/benchmark.jpg)
 
 The Python bindings are generated with
 [nanobind](https://github.com/wjakob/nanobind), which makes it easily

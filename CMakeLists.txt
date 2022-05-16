@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17...3.22)
 
-project(cholespy LANGUAGES CXX C VERSION "0.1.1")
+project(cholespy LANGUAGES CXX C VERSION "0.1.2")
 
 # Nanobind setup from https://github.com/wjakob/nanobind_example/blob/master/CMakeLists.txt
 if (NOT SKBUILD)
