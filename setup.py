@@ -12,6 +12,11 @@ except ImportError:
 
 from setuptools import find_packages
 
+# read the contents of your README file (https://packaging.python.org/en/latest/guides/making-a-pypi-friendly-readme/)
+from pathlib import Path
+this_directory = Path(__file__).parent
+readme = (this_directory / "README.md").read_text()
+
 setup(
     name="cholespy",
     version="0.1.0",
@@ -23,5 +28,6 @@ setup(
     cmake_install_dir="src/cholespy",
     include_package_data=True,
     python_requires=">=3.8",
+    long_description=readme,
     long_description_content_type="text/markdown"
 )
