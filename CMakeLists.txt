@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.17...3.22)
+cmake_minimum_required(VERSION 3.18...3.22)
 
 project(cholespy LANGUAGES CXX C VERSION "0.1.2")
 
@@ -28,7 +28,11 @@ elseif (MSVC)
   find_package(Python)
 endif()
 
-find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+if (UNIX AND NOT APPLE)
+  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+else()
+  find_package(Python COMPONENTS Interpreter Development REQUIRED)
+endif()
 
 # Run `nanobind.cmake_dir()` from Python to detect install location
 execute_process(
