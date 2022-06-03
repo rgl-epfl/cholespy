@@ -20,7 +20,19 @@ analysis step run *once* when building the solver for fast solving on the GPU
 It achieves comparable performance as other frameworks, with the dependencies
 nicely shipped along.
 
-![Benchmark](https://raw.githubusercontent.com/rgl-epfl/cholespy/main/tests/benchmark.jpg)
+<br />
+<p align="center">
+
+  <a href="https://bnicolet.com/publications/Nicolet2021Large.html">
+    <img src="https://raw.githubusercontent.com/rgl-epfl/cholespy/main/tests/benchmark.jpg" alt="Benchmark" width="100%">
+  </a>
+
+  <p align="center">
+      Benchmark run on a Linux Ryzen 3990X workstation with a TITAN RTX.
+  </p>
+</p>
+
+<br />
 
 The Python bindings are generated with
 [nanobind](https://github.com/wjakob/nanobind), which makes it easily
