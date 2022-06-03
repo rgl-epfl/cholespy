@@ -15,14 +15,7 @@ if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-wind
     "by invoking\n$ git submodule update --init --recursive")
 endif()
 
-
-if (SKBUILD)
-  # Constrain FindPython to find the Python version used by scikit-build
-  set(Python_VERSION "${PYTHON_VERSION_STRING}")
-  set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
-  set(Python_INCLUDE_DIR "${PYTHON_INCLUDE_DIR}")
-  set(Python_LIBRARIES "${PYTHON_LIBRARY}")
-elseif (MSVC)
+if (MSVC AND NOT SKBUILD)
   # MSVC needs a little extra help finding the Python library
   find_package(PythonInterp)
   find_package(Python)
