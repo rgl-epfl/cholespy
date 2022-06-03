@@ -6,6 +6,7 @@ on:
   push:
     branches:
      - main
+     - wheels
   release:
     types:
       - published
@@ -54,7 +55,7 @@ jobs:
       with:
         submodules: true
 
-    - uses: pypa/cibuildwheel@v2.5.0
+    - uses: pypa/cibuildwheel@v2.4.0
 
     - name: Verify clean directory
       run: git diff --exit-code
