@@ -28,7 +28,7 @@ elseif (MSVC)
   find_package(Python)
 endif()
 
-find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+find_package(Python COMPONENTS Interpreter Development REQUIRED)
 
 # Run `nanobind.cmake_dir()` from Python to detect install location
 execute_process(
