@@ -61,7 +61,7 @@ bool init_cuda() {
         return true;
 
 #if defined(_WIN32)
-    handle = (void *) LoadLibraryA("cuda.dll");
+    handle = (void *) LoadLibraryA("nvcuda.dll");
 #elif defined(__APPLE__)
     handle = nullptr;
 #else
