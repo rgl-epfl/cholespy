@@ -96,7 +96,7 @@ below:
   same shape as `b`.
 
 `x` and `b` **must** have the same dtype as the solver used, i.e. `float32` for
-`CholeskySolverF` or `float64` for `CholeskySolver64`. Since `x` is modified in
+`CholeskySolverF` or `float64` for `CholeskySolverD`. Since `x` is modified in
 place, implicit type conversion is not supported.
 
 # Example usage
