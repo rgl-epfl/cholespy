@@ -58,6 +58,7 @@ nanobind_add_module(
   src/docstr.h               src/main.cpp)
 
 set_property(TARGET _cholespy_core PROPERTY POSITION_INDEPENDENT_CODE ON)
+set_property(TARGET metis PROPERTY POSITION_INDEPENDENT_CODE ON)
 target_compile_features(_cholespy_core PRIVATE cxx_std_17)
 target_link_libraries(_cholespy_core PUBLIC cholmod)
 
