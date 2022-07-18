@@ -82,7 +82,7 @@ bool init_cuda() {
         symbol = nullptr
 
     do {
-        LOAD(cuDevicePrimaryCtxRelease);
+        LOAD(cuDevicePrimaryCtxRelease, "v2");
         LOAD(cuDevicePrimaryCtxRetain);
         LOAD(cuDeviceGet);
         LOAD(cuCtxPushCurrent, "v2");
@@ -90,12 +90,24 @@ bool init_cuda() {
         LOAD(cuGetErrorName);
         LOAD(cuGetErrorString);
         LOAD(cuInit);
-        LOAD(cuLaunchKernel, "ptsz");
         LOAD(cuMemAlloc, "v2");
         LOAD(cuMemFree, "v2");
+
+        /* By default, cholespy dispatches to the legacy CUDA stream. That
+           makes it easier to reliably exchange information with packages that
+           enqueue work on other CUDA streams */
+#if defined(CHOLESPY_USE_PER_THREAD_DEFAULT_STREAM)
+        LOAD(cuLaunchKernel, "ptsz");
         LOAD(cuMemcpyAsync, "ptsz");
         LOAD(cuMemsetD8Async, "ptsz");
         LOAD(cuMemsetD32Async, "ptsz");
+#else
+        LOAD(cuLaunchKernel);
+        LOAD(cuMemcpyAsync);
+        LOAD(cuMemsetD8Async);
+        LOAD(cuMemsetD32Async);
+#endif
+
         LOAD(cuModuleGetFunction);
         LOAD(cuModuleLoadData);
         LOAD(cuModuleUnload);
