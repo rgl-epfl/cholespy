@@ -186,7 +186,7 @@ def test_frameworks(framework):
         solver = CholeskySolverF(n_verts, drjit.cuda.TensorXi(idx[0]), drjit.cuda.TensorXi(idx[1]), drjit.cuda.TensorXf64(values), MatrixType.COO)
 
         b_drjit = drjit.cuda.TensorXf(b)
-        x_drjit = drjit.zero(drjit.cuda.TensorXf, b.shape)
+        x_drjit = drjit.zeros(drjit.cuda.TensorXf, b.shape)
         solver.solve(b_drjit, x_drjit)
         assert(np.allclose(x_drjit.numpy(), x_ref))
 
@@ -194,6 +194,6 @@ def test_frameworks(framework):
         solver = CholeskySolverF(n_verts, drjit.llvm.TensorXi(idx[0]), drjit.llvm.TensorXi(idx[1]), drjit.llvm.TensorXf64(values), MatrixType.COO)
 
         b_drjit = drjit.llvm.TensorXf(b)
-        x_drjit = drjit.zero(drjit.llvm.TensorXf, b.shape)
+        x_drjit = drjit.zeros(drjit.llvm.TensorXf, b.shape)
         solver.solve(b_drjit, x_drjit)
         assert(np.allclose(x_drjit.numpy(), x_ref))
