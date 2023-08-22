@@ -1,7 +1,7 @@
 #include "cholesky_solver.h"
 #include "docstr.h"
 #include <nanobind/nanobind.h>
-#include <nanobind/tensor.h>
+#include <nanobind/ndarray.h>
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -20,9 +20,9 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
     nb::class_<Class>(m, class_name.c_str(), docstr)
         .def("__init__", [](Class *self,
                             uint32_t n_rows,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::c_contig> ii,
-                            nb::tensor<int32_t, nb::shape<nb::any>, nb::c_contig> jj,
-                            nb::tensor<double, nb::shape<nb::any>, nb::c_contig> x,
+                            nb::ndarray<int32_t, nb::shape<nb::any>, nb::c_contig> ii,
+                            nb::ndarray<int32_t, nb::shape<nb::any>, nb::c_contig> jj,
+                            nb::ndarray<double, nb::shape<nb::any>, nb::c_contig> x,
                             MatrixType type) {
 
             if (type == MatrixType::COO){
@@ -78,8 +78,8 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
         nb::arg("type"),
         doc_constructor)
         .def("solve", [](Class &self,
-                        nb::tensor<Float, nb::c_contig> b,
-                        nb::tensor<Float, nb::c_contig> x){
+                        nb::ndarray<Float, nb::c_contig> b,
+                        nb::ndarray<Float, nb::c_contig> x){
             if (b.ndim() != 1 && b.ndim() != 2)
                 throw std::invalid_argument("Expected 1D or 2D tensors as input.");
             if (b.shape(0) != x.shape(0) || (b.ndim() == 2 && b.shape(1) != x.shape(1)))
