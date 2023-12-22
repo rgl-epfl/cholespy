@@ -36,8 +36,6 @@ public:
     // Solve the whole system using the Cholesky factorization on the CPU
     void solve_cpu(int n_rhs, Float *b, Float *x, int mode);
 
-    // Return whether the solver solves on the CPU or on the GPU
-    bool is_cpu() { return m_cpu; };
 
 private:
 

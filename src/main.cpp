@@ -41,7 +41,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
 
             if (ii.device_type() == nb::device::cpu::value) {
                 // CPU init
-                new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true);
+                new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type);
             } else
                 throw std::invalid_argument("Unsupported input device! Only CPU supported.");
         },
@@ -53,7 +53,8 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
         doc_constructor)
         .def("solve", [](Class &self,
                         nb::ndarray<Float, nb::c_contig> b,
-                        nb::ndarray<Float, nb::c_contig> x){
+                        nb::ndarray<Float, nb::c_contig> x,
+                        int mode){
             if (b.ndim() != 1 && b.ndim() != 2)
                 throw std::invalid_argument("Expected 1D or 2D tensors as input.");
             if (b.shape(0) != x.shape(0) || (b.ndim() == 2 && b.shape(1) != x.shape(1)))
@@ -63,12 +64,13 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
 
             // CPU solve
             if (b.device_type() == nb::device::cpu::value) {
-                self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data());
+                self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data(), mode);
             } else
                 throw std::invalid_argument("Unsupported input device! Only CPU supported.");
         },
         nb::arg("b").noconvert(),
         nb::arg("x").noconvert(),
+        nb::arg("mode") = 0,
         doc_solve);
 }
 

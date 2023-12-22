@@ -52,8 +52,6 @@ include_directories("${CHOLMOD_SOURCE_DIR}/Include")
 nanobind_add_module(
   _cholespy_core NB_STATIC
 
-  kernels/kernels.h
-  src/cuda_driver.h          src/cuda_driver.cpp
   src/cholesky_solver.h      src/cholesky_solver.cpp
   src/docstr.h               src/main.cpp)
 
