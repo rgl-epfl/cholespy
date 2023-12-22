@@ -37,8 +37,7 @@ Parameters
 
 - `b` - Right-hand side of the equation to solve. Can be a vector or a matrix.
         If it is a matrix, it must be of shape `(n_rows, n_rhs)`. It must be on the
-        same device as the tensors passed to the solver constructor. If using CUDA
-        arrays, then the maximum supported value for `n_rhs` is `128`.
+        same device as the tensors passed to the solver constructor.
 - `x` - Placeholder for the solution. It must be on the same device and have the
           same shape as `b`.
 

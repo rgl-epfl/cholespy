@@ -1,5 +1,4 @@
 #include "cholesky_solver.h"
-#include "cuda_driver.h"
 #include <algorithm>
 #include <exception>
 
@@ -149,7 +148,7 @@ void csc_sum_duplicates(int n_rows, int &m_nnz, int **col_ptr, int **rows, doubl
 }
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu) : m_n(n_rows), m_nnz(nnz), m_cpu(cpu) {
+CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type) : m_n(n_rows), m_nnz(nnz) {
 
 
     // Placeholders for the CSC matrix data
@@ -177,15 +176,6 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, dou
     // CHOLMOD expects a CSC matrix without duplicate entries, so we sum them:
     csc_sort_indices(n_rows, nnz, col_ptr, rows, data);
     csc_sum_duplicates(n_rows, m_nnz, &col_ptr, &rows, &data);
-    if (!m_cpu) {
-        // Mask of rows already processed
-        cuda_check(cuMemAlloc(&m_processed_rows_d, m_n*sizeof(bool)));
-        cuda_check(cuMemsetD8Async(m_processed_rows_d, 0, m_n, 0)); // Initialize to all false
-
-        // Row id
-        cuda_check(cuMemAlloc(&m_stack_id_d, sizeof(int)));
-        cuda_check(cuMemsetD32Async(m_stack_id_d, 0, 1, 0));
-    }
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
     factorize(col_ptr, rows, data);
@@ -241,198 +231,11 @@ void CholeskySolver<Float>::factorize(int *col_ptr, int *rows, double *data) {
     if (m_common.status == CHOLMOD_NOT_POSDEF)
         throw std::invalid_argument("Matrix is not positive definite!");
 
-    // Setup GPU solving analysis phase
-    if (!m_cpu) {
-        // Copy permutation
-        cuda_check(cuMemAlloc(&m_perm_d, m_n*sizeof(int)));
-        cuda_check(cuMemcpyAsync(m_perm_d, m_factor->Perm, m_n*sizeof(int), 0));
-
-        cholmod_sparse *lower_csc = cholmod_factor_to_sparse(m_factor, &m_common);
-        // The transpose of a CSC (resp. CSR) matrix is its CSR (resp. CSC) representation
-        cholmod_sparse *lower_csr = cholmod_transpose(lower_csc, 1, &m_common);
-
-        // Since we can only factorize in double precision mode, we have to recast the data array to Float
-        Float *csc_data;
-        Float *csr_data;
-        if (std::is_same_v<Float, double>) {
-            csc_data = (Float *) lower_csc->x;
-            csr_data = (Float *) lower_csr->x;
-        } else {
-            csc_data = (Float *)malloc(lower_csc->nzmax * sizeof(Float));
-            csr_data = (Float *)malloc(lower_csr->nzmax * sizeof(Float));
-
-            double *csc_data_ptr = (double *) lower_csc->x;
-            double *csr_data_ptr = (double *) lower_csr->x;
-
-            for (int32_t i=0; i < lower_csc->nzmax; i++) {
-                csc_data[i] = (Float) csc_data_ptr[i];
-                csr_data[i] = (Float) csr_data_ptr[i];
-            }
-        }
-
-        int n_rows = lower_csc->nrow;
-        int n_entries = lower_csc->nzmax;
-
-        // The CSC representation of a matrix is the same as the CSR of its transpose
-        analyze_cuda(n_rows, n_entries, lower_csr->p, lower_csr->i, csr_data, true);
-
-        // To prepare the transpose we merely need to swap the roles of the CSR and CSC representations (CSC rows -> CSR cols, CSC cols -> CSR rows)
-        analyze_cuda(n_rows, n_entries, lower_csc->p, lower_csc->i, csc_data, false);
-
-        if (!std::is_same_v<Float, double>) {
-            free(csc_data);
-            free(csr_data);
-        }
-        cholmod_free_sparse(&lower_csc, &m_common);
-        cholmod_free_sparse(&lower_csr, &m_common);
-    }
-
     cholmod_free_sparse(&A, &m_common);
-
-    // The context and factor will be needed for solving on the CPU, so only free them if we solve on the GPU
-    if (!m_cpu) {
-        cholmod_free_factor(&m_factor, &m_common);
-        cholmod_finish(&m_common);
-    }
-}
-
-template <typename Float>
-void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower) {
-
-    CUdeviceptr *rows_d = (lower ? &m_lower_rows_d : &m_upper_rows_d);
-    CUdeviceptr *cols_d = (lower ? &m_lower_cols_d : &m_upper_cols_d);
-    CUdeviceptr *data_d = (lower ? &m_lower_data_d : &m_upper_data_d);
-    CUdeviceptr *levels_d = (lower ? &m_lower_levels_d : &m_upper_levels_d);
-
-    // CSR Matrix arrays
-    cuda_check(cuMemAlloc(rows_d, (1+n_rows)*sizeof(int)));
-    cuda_check(cuMemcpyAsync(*rows_d, csr_rows, (1+n_rows)*sizeof(int), 0));
-    cuda_check(cuMemAlloc(cols_d, n_entries*sizeof(int)));
-    cuda_check(cuMemcpyAsync(*cols_d, csr_cols, n_entries*sizeof(int), 0));
-    cuda_check(cuMemAlloc(data_d, n_entries*sizeof(Float)));
-    cuda_check(cuMemcpyAsync(*data_d, csr_data, n_entries*sizeof(Float), 0));
-
-    // Row i belongs in level level_ind[i]
-    CUdeviceptr level_ind_d;
-    cuda_check(cuMemAlloc(&level_ind_d, n_rows*sizeof(int)));
-    cuda_check(cuMemsetD32Async(level_ind_d, 0, n_rows, 0));
-
-    cuda_check(cuMemsetD8Async(m_processed_rows_d, 0, n_rows, 0)); // Initialize to all false
-
-    CUdeviceptr max_lvl_d;
-    cuda_check(cuMemAlloc(&max_lvl_d, sizeof(int)));
-    cuda_check(cuMemsetD32Async(max_lvl_d, 0, 1, 0));
-
-    void *args[6] = {
-        &n_rows,
-        &max_lvl_d,
-        &m_processed_rows_d,
-        &level_ind_d,
-        rows_d,
-        cols_d
-    };
-
-    CUfunction analysis_kernel = (lower ? analysis_lower : analysis_upper);
-    cuda_check(cuLaunchKernel(analysis_kernel,
-                            n_rows, 1, 1,
-                            1, 1, 1,
-                            0, 0, args, 0));
-
-    int *level_ind_h = (int *) malloc(n_rows*sizeof(int));
-    cuda_check(cuMemcpyAsync((CUdeviceptr) level_ind_h, level_ind_d, n_rows*sizeof(int), 0));
-
-    int max_lvl_h = 0;
-    cuda_check(cuMemcpyAsync((CUdeviceptr) &max_lvl_h, max_lvl_d, sizeof(int), 0));
-    int n_levels = max_lvl_h + 1;
-
-    // Construct the (sorted) level array
-    int *levels_h = (int *) malloc(n_rows*sizeof(int));
-    std::vector<int> level_ptr(n_levels + 1, 0);
-    // Count the number of rows per level
-    for (int i=0; i<n_rows; i++) {
-        level_ptr[1+level_ind_h[i]]++;
-    }
-
-    // Convert into the list of pointers to the start of each level
-    for (int i=0, S=0; i<n_levels; i++){
-        S += level_ptr[i+1];
-        level_ptr[i+1] = S;
-    }
-
-    // Move all rows to their place in the level array
-    for (int i=0; i<n_rows; i++) {
-        int row_level = level_ind_h[i]; // Row i belongs to level row_level
-        levels_h[level_ptr[row_level]] = i;
-        level_ptr[row_level]++;
-    }
-
-    cuda_check(cuMemAlloc(levels_d, n_rows*sizeof(int)));
-    cuda_check(cuMemcpyAsync(*levels_d, levels_h, n_rows*sizeof(int), 0));
-
-    // Free useless stuff
-    free(levels_h);
-    free(level_ind_h);
-    cuda_check(cuMemFree(level_ind_d));
 }
 
 template<typename Float>
-void CholeskySolver<Float>::launch_kernel(bool lower, CUdeviceptr x) {
-    // Initialize buffers
-    cuda_check(cuMemsetD8Async(m_processed_rows_d, 0, m_n, 0)); // Initialize to all false
-    cuda_check(cuMemsetD32Async(m_stack_id_d, 0, 1, 0));
-
-    CUdeviceptr rows_d = (lower ? m_lower_rows_d : m_upper_rows_d);
-    CUdeviceptr cols_d = (lower ? m_lower_cols_d : m_upper_cols_d);
-    CUdeviceptr data_d = (lower ? m_lower_data_d : m_upper_data_d);
-    CUdeviceptr levels_d = (lower ? m_lower_levels_d : m_upper_levels_d);
-
-    void *args[11] = {
-        &m_nrhs,
-        &m_n,
-        &m_stack_id_d,
-        &levels_d,
-        &m_processed_rows_d,
-        &rows_d,
-        &cols_d,
-        &data_d,
-        &m_tmp_d,
-        &x, // This is the array we read from (i.e. b) for lower, and where we write to (i.e. x) for upper
-        &m_perm_d
-    };
-
-    CUfunction solve_kernel;
-    if(std::is_same_v<Float, float>)
-        solve_kernel = (lower ? solve_lower_float : solve_upper_float);
-    else
-        solve_kernel = (lower ? solve_lower_double : solve_upper_double);
-
-    cuda_check(cuLaunchKernel(solve_kernel,
-                            m_n, 1, 1,
-                            128, 1, 1,
-                            0, 0, args, 0));
-}
-
-template <typename Float>
-void CholeskySolver<Float>::solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x) {
-
-    if (n_rhs != m_nrhs) {
-        if (n_rhs > 128)
-            throw std::invalid_argument("The number of RHS should be less than 128.");
-        // We need to modify the allocated memory for the solution
-        if (m_tmp_d)
-            cuda_check(cuMemFree(m_tmp_d));
-        cuda_check(cuMemAlloc(&m_tmp_d, n_rhs * m_n * sizeof(Float)));
-        m_nrhs = n_rhs;
-    }
-
-    // Solve lower
-    launch_kernel(true, b);
-    // Solve upper
-    launch_kernel(false, x);
-}
-
-template<typename Float>
-void CholeskySolver<Float>::solve_cpu(int n_rhs, Float *b, Float *x) {
+void CholeskySolver<Float>::solve_cpu(int n_rhs, Float *b, Float *x, int mode) {
 
     if (n_rhs != m_nrhs) {
         // We need to modify the allocated memory for the solution
@@ -452,7 +255,7 @@ void CholeskySolver<Float>::solve_cpu(int n_rhs, Float *b, Float *x) {
         for (int j=0; j<n_rhs; ++j)
             tmp[i + j*m_n] = (double) b[i*n_rhs + j];
 
-    cholmod_dense *cholmod_x = cholmod_solve(CHOLMOD_A, m_factor, m_tmp_chol, &m_common);
+    cholmod_dense *cholmod_x = cholmod_solve(mode, m_factor, m_tmp_chol, &m_common);
 
     double *sol = (double *) cholmod_x->x;
     for (int i=0; i<m_n; ++i)
@@ -464,25 +267,8 @@ void CholeskySolver<Float>::solve_cpu(int n_rhs, Float *b, Float *x) {
 
 template <typename Float>
 CholeskySolver<Float>::~CholeskySolver() {
-    if (m_cpu){
-        cholmod_free_factor(&m_factor, &m_common);
-        cholmod_finish(&m_common);
-    } else {
-        scoped_set_context guard(cu_context);
-
-        cuda_check(cuMemFree(m_processed_rows_d));
-        cuda_check(cuMemFree(m_stack_id_d));
-        cuda_check(cuMemFree(m_perm_d));
-        cuda_check(cuMemFree(m_tmp_d));
-        cuda_check(cuMemFree(m_lower_rows_d));
-        cuda_check(cuMemFree(m_lower_cols_d));
-        cuda_check(cuMemFree(m_lower_data_d));
-        cuda_check(cuMemFree(m_upper_rows_d));
-        cuda_check(cuMemFree(m_upper_cols_d));
-        cuda_check(cuMemFree(m_upper_data_d));
-        cuda_check(cuMemFree(m_lower_levels_d));
-        cuda_check(cuMemFree(m_upper_levels_d));
-    }
+    cholmod_free_factor(&m_factor, &m_common);
+    cholmod_finish(&m_common);
 }
 
 template class CholeskySolver<float>;

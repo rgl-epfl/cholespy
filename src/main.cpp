@@ -6,12 +6,7 @@
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
 
-#define cuda_check(err) cuda_check_impl(err, __FILE__, __LINE__)
-
-void cuda_check_impl(CUresult errval, const char *file, const int line);
 namespace nb = nanobind;
-
-// void cuda_check_impl(CUresult errval, const char *file, const int line);
 
 template <typename Float>
 void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *docstr) {
@@ -44,32 +39,11 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
             if (ii.device_type() != jj.device_type() || ii.device_type() != x.device_type())
                 throw std::invalid_argument("All input tensors should be on the same device!");
 
-            if (ii.device_type() == nb::device::cuda::value) {
-                // GPU init
-
-                // Initialize CUDA and load the kernels if not already done
-                init_cuda();
-
-                scoped_set_context guard(cu_context);
-
-                int *indices_a = (int *) malloc(ii.shape(0)*sizeof(int));
-                int *indices_b = (int *) malloc(jj.shape(0)*sizeof(int));
-                double *data = (double *) malloc(x.shape(0)*sizeof(double));
-
-                cuda_check(cuMemcpyAsync((CUdeviceptr) indices_a, (CUdeviceptr) ii.data(), ii.shape(0)*sizeof(int), 0));
-                cuda_check(cuMemcpyAsync((CUdeviceptr) indices_b, (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
-                cuda_check(cuMemcpyAsync((CUdeviceptr) data, (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
-
-                new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false);
-
-                free(indices_a);
-                free(indices_b);
-                free(data);
-            } else if (ii.device_type() == nb::device::cpu::value) {
+            if (ii.device_type() == nb::device::cpu::value) {
                 // CPU init
                 new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true);
             } else
-                throw std::invalid_argument("Unsupported input device! Only CPU and CUDA arrays are supported.");
+                throw std::invalid_argument("Unsupported input device! Only CPU supported.");
         },
         nb::arg("n_rows"),
         nb::arg("ii"),
@@ -89,21 +63,9 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
 
             // CPU solve
             if (b.device_type() == nb::device::cpu::value) {
-                if (!self.is_cpu())
-                    throw std::invalid_argument("Input device is CPU but the solver was initialized for CUDA.");
-
                 self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data());
-            }
-            // CUDA solve
-            else if (b.device_type() == nb::device::cuda::value) {
-                if (self.is_cpu())
-                    throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
-
-                scoped_set_context guard(cu_context);
-                self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
-            }
-            else
-                throw std::invalid_argument("Unsupported input device! Only CPU and CUDA arrays are supported.");
+            } else
+                throw std::invalid_argument("Unsupported input device! Only CPU supported.");
         },
         nb::arg("b").noconvert(),
         nb::arg("x").noconvert(),
@@ -123,10 +85,6 @@ NB_MODULE(_cholespy_core, m_) {
     declare_cholesky<float>(m, "F", doc_cholesky_f);
     declare_cholesky<double>(m, "D", doc_cholesky_d);
 
-    // Custom object to gracefully shutdown CUDA when unloading the module
-    nb::detail::keep_alive(m.ptr(),
-                           (void *) 1, // Unused payload
-                           [](void *p) noexcept { shutdown_cuda(); });
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
