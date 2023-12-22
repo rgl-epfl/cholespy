@@ -62,6 +62,8 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
             if (b.device_type() != x.device_type())
                 throw std::invalid_argument("x and b should be on the same device.");
 
+            if (mode < 0 || mode > 8)
+                throw std::invalid_argument("Invalid mode.");
             // CPU solve
             if (b.device_type() == nb::device::cpu::value) {
                 self.solve_cpu(b.ndim()==2 ? b.shape(1) : 1, (Float *) b.data(), (Float *) x.data(), mode);
