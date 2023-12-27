@@ -33,35 +33,9 @@ if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-wind
     "by invoking\n$ git submodule update --init --recursive")
 endif()
 
-if (SKBUILD)
-  # Constrain FindPython to find the Python version used by scikit-build
-  set(Python_VERSION "${PYTHON_VERSION_STRING}")
-  set(Python_EXECUTABLE "${PYTHON_EXECUTABLE}")
-  set(Python_INCLUDE_DIR "${PYTHON_INCLUDE_DIR}")
-  set(Python_LIBRARIES "${PYTHON_LIBRARY}")
-elseif (MSVC)
-  # MSVC needs a little extra help finding the Python library
-  find_package(PythonInterp)
-  find_package(Python)
-endif()
-
-if (UNIX AND NOT APPLE)
-  find_package(Python 3.8
-    REQUIRED COMPONENTS Interpreter Development.Module
-    OPTIONAL_COMPONENTS Development.SABIModule )
-else()
-  find_package(Python 3.8
-    REQUIRED COMPONENTS Interpreter Development
-    OPTIONAL_COMPONENTS Development.SABIModule )
-endif()
-
-# Run `nanobind.cmake_dir()` from Python to detect install location
-execute_process(
-  COMMAND
-  "${PYTHON_EXECUTABLE}" -c "import nanobind; print(nanobind.cmake_dir())"
-  OUTPUT_VARIABLE _tmp_dir
-  OUTPUT_STRIP_TRAILING_WHITESPACE COMMAND_ECHO STDOUT)
-list(APPEND CMAKE_PREFIX_PATH "${_tmp_dir}")
+find_package(Python 3.8
+  REQUIRED COMPONENTS Interpreter Development.Module
+  OPTIONAL_COMPONENTS Development.SABIModule)
 
 # Now import nanobind from CMake
 find_package(nanobind CONFIG REQUIRED)
@@ -78,8 +52,10 @@ nanobind_add_module(
   # does nothing on older Python versions
   STABLE_ABI
 
-  src/cholesky_solver.h      src/cholesky_solver.cpp
-  src/docstr.h               src/cholespy_core.cpp)
+  src/cholesky_solver.h
+  src/cholesky_solver.cpp
+  src/docstr.h
+  src/cholespy_core.cpp)
 
 set_property(TARGET _cholespy_core PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET metis PROPERTY POSITION_INDEPENDENT_CODE ON)
@@ -88,10 +64,10 @@ target_link_libraries(_cholespy_core PUBLIC cholmod)
 
 target_compile_definitions(_cholespy_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 
-install(TARGETS _cholespy_core LIBRARY DESTINATION cholesky_core)
+install(TARGETS _cholespy_core LIBRARY DESTINATION cholespy)
 
 if (WIN32)
   file(GLOB SUITESPARSE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-windows/lapack_windows/x64/*.dll)
   message(STATUS ${SUITESPARSE_FILES})
-  install(FILES ${SUITESPARSE_FILES} DESTINATION cholesky_core)
+  install(FILES ${SUITESPARSE_FILES} DESTINATION cholespy)
 endif()

@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import sparse
-from cholespy_core import CholeskySolver, MatrixType
+from cholespy._cholespy_core import CholeskySolver
 
 CHOLMOD_A = 0
 CHOLMOD_LDLt = 1
@@ -23,12 +23,11 @@ class SparseCholesky:
             self._shape,
             A.indptr,
             A.indices,
-            A.data,
-            MatrixType.CSC)
+            A.data)
 
     def _solve(self, b, method):
-        res = np.zeros_like(b)
-        self._solver.solve(b, res, method)
+        res = np.zeros_like(b, dtype=np.float64)
+        self._solver.solve(b.astype(np.float64), res, method)
         return res
 
     def solve_A(self, b):
@@ -59,5 +58,5 @@ class SparseCholesky:
         return self._solve(b, CHOLMOD_Pt)
 
     def P(self):
-        self.apply_P(np.arange(self._shape))
+        return self.apply_P(np.arange(self._shape))
 

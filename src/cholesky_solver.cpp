@@ -2,94 +2,6 @@
 #include <algorithm>
 #include <exception>
 
-// Sparse matrix utility functions, inspired from Scipy https://github.com/scipy/scipy
-
-void coo_to_csc(int n_rows, int nnz, const int *coo_i, const int *coo_j, const double *coo_x, int *csc_col_ptr, int *csc_rows, double *csc_data) {
-
-    // Count non zero entries per column
-    for (int i=0; i<nnz; ++i) {
-        csc_col_ptr[coo_j[i]]++;
-    }
-
-    /*
-    Build the column pointer array, where tmp_col_ptr[i] is the start of the
-    i-th column in the other arrays
-    */
-    for (int i=0, S=0; i<n_rows; i++) {
-        int tmp = csc_col_ptr[i];
-        csc_col_ptr[i] = S;
-        S += tmp;
-    }
-    csc_col_ptr[n_rows] = nnz;
-
-    /*
-    Now move the row indices of each entry so that entries in column j are in
-    positions tmp_col_ptr[j] to tmp_col_ptr[j+1]-1
-    */
-    for (int i=0; i<nnz; i++) {
-        int col = coo_j[i];
-        int dst = csc_col_ptr[col];
-
-        csc_rows[dst] = coo_i[i];
-        csc_data[dst] = coo_x[i];
-
-        csc_col_ptr[col]++;
-    }
-
-    // Undo the modifications to tmp_col_ptr from the previous step
-    for(int i = 0, last = 0; i <= n_rows; i++){
-        int temp = csc_col_ptr[i];
-        csc_col_ptr[i] = last;
-        last = temp;
-    }
-
-    // We now have a CSC representation of our matrix, potentially with duplicates.
-}
-
-void csr_to_csc(int n_rows, int nnz, const int *csr_row_ptr, const int *csr_cols, const double *csr_data, int *csc_col_ptr, int *csc_rows, double *csc_data) {
-
-    // Count non zero entries per column
-    for (int i=0; i<nnz; ++i) {
-        csc_col_ptr[csr_cols[i]]++;
-    }
-
-    /*
-    Build the column pointer array, where tmp_col_ptr[i] is the start of the
-    i-th column in the other arrays
-    */
-    for (int i=0, S=0; i<n_rows; ++i) {
-        int tmp = csc_col_ptr[i];
-        csc_col_ptr[i] = S;
-        S += tmp;
-    }
-    csc_col_ptr[n_rows] = nnz;
-
-    /*
-    Now move the row indices of each entry so that entries in column j are in
-    positions tmp_col_ptr[j] to tmp_col_ptr[j+1]-1
-    */
-    for (int i=0; i<n_rows; ++i) {
-        for (int j=csr_row_ptr[i]; j<csr_row_ptr[i+1]; ++j){
-            int col = csr_cols[j];
-            int dst = csc_col_ptr[col];
-
-            csc_rows[dst] = i;
-            csc_data[dst] = csr_data[j];
-
-            csc_col_ptr[col]++;
-        }
-    }
-
-    // Undo the modifications to tmp_col_ptr from the previous step
-    for(int i = 0, last = 0; i <= n_rows; ++i){
-        int temp = csc_col_ptr[i];
-        csc_col_ptr[i] = last;
-        last = temp;
-    }
-
-    // We now have a CSC representation of our matrix, potentially with duplicates.
-}
-
 // Re-order (in place) the data of a CSC matrix so that row indices are sorted
 void csc_sort_indices(int n_rows, int nnz, int *col_ptr, int *rows, double *data) {
     std::vector<std::pair<int, double>> tmp;
@@ -148,30 +60,14 @@ void csc_sum_duplicates(int n_rows, int &m_nnz, int **col_ptr, int **rows, doubl
 }
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type) : m_n(n_rows), m_nnz(nnz) {
-
-
+CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x) : m_n(n_rows), m_nnz(nnz) {
     // Placeholders for the CSC matrix data
     int *col_ptr, *rows;
     double *data;
 
-    // Allocate data for the CSC matrix if conversion is needed
-    if (type != MatrixType::CSC) {
-        col_ptr = (int *) calloc(n_rows + 1, sizeof(int));
-        rows = (int *) malloc(nnz * sizeof(int));
-        data = (double *) malloc(nnz * sizeof(double));
-    }
-
-    // Check the matrix and convert it to CSC if necessary
-    if (type == MatrixType::COO)
-        coo_to_csc(n_rows, nnz, ii, jj, x, col_ptr, rows, data);
-    else if (type == MatrixType::CSR)
-        csr_to_csc(n_rows, nnz, ii, jj, x, col_ptr, rows, data);
-    else {
-        col_ptr = ii;
-        rows = jj;
-        data = x;
-    }
+    col_ptr = ii;
+    rows = jj;
+    data = x;
 
     // CHOLMOD expects a CSC matrix without duplicate entries, so we sum them:
     csc_sort_indices(n_rows, nnz, col_ptr, rows, data);
@@ -179,12 +75,6 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, dou
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
     factorize(col_ptr, rows, data);
-
-    if (type != MatrixType::CSC) {
-        free(col_ptr);
-        free(rows);
-        free(data);
-    }
 }
 
 template <typename Float>

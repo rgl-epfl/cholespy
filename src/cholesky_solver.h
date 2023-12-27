@@ -4,12 +4,6 @@
 #include <vector>
 #include "cholmod.h"
 
-enum MatrixType {
-    CSC = 0,
-    CSR,
-    COO
-};
-
 /**
  * Cholesky Solver Class
  *
@@ -24,12 +18,11 @@ public:
      *
      * @param n_rows The number of rows in the matrix
      * @param nnz The number of nonzero entries
-     * @param ii Array of row indices if type==COO, column (resp. row) pointer array if type==CSC (resp. CSR)
-     * @param ii Array of row indices if type==COO or CSC, column indices if type==CSR
+     * @param ii column (resp. row) pointer array
+     * @param ii Array of row indices
      * @param x Array of nonzero entries
-     * @param type The type of the matrix representation. Can be COO, CSC or CSR
      */
-    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type);
+    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x);
 
     ~CholeskySolver();
 
