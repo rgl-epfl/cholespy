@@ -46,9 +46,13 @@ elseif (MSVC)
 endif()
 
 if (UNIX AND NOT APPLE)
-  find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
+  find_package(Python 3.8
+    REQUIRED COMPONENTS Interpreter Development.Module
+    OPTIONAL_COMPONENTS Development.SABIModule )
 else()
-  find_package(Python COMPONENTS Interpreter Development REQUIRED)
+  find_package(Python 3.8
+    REQUIRED COMPONENTS Interpreter Development
+    OPTIONAL_COMPONENTS Development.SABIModule )
 endif()
 
 # Run `nanobind.cmake_dir()` from Python to detect install location
@@ -69,6 +73,11 @@ include_directories("${CHOLMOD_SOURCE_DIR}/Include")
 nanobind_add_module(
   _cholespy_core NB_STATIC
 
+  # Target the stable ABI for Python 3.12+, which reduces
+  # the number of binary wheels that must be built. This
+  # does nothing on older Python versions
+  STABLE_ABI
+
   src/cholesky_solver.h      src/cholesky_solver.cpp
   src/docstr.h               src/cholespy_core.cpp)
 
@@ -79,10 +88,10 @@ target_link_libraries(_cholespy_core PUBLIC cholmod)
 
 target_compile_definitions(_cholespy_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 
-install(TARGETS _cholespy_core LIBRARY DESTINATION .)
+install(TARGETS _cholespy_core LIBRARY DESTINATION cholesky_core)
 
 if (WIN32)
   file(GLOB SUITESPARSE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-windows/lapack_windows/x64/*.dll)
   message(STATUS ${SUITESPARSE_FILES})
-  install(FILES ${SUITESPARSE_FILES} DESTINATION .)
+  install(FILES ${SUITESPARSE_FILES} DESTINATION cholesky_core)
 endif()
