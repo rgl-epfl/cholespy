@@ -1,11 +1,29 @@
 cmake_minimum_required(VERSION 3.18...3.22)
 
-project(cholespy LANGUAGES CXX C VERSION "1.0.0")
+project(cholespy LANGUAGES CXX C)
 
-# Nanobind setup from https://github.com/wjakob/nanobind_example/blob/master/CMakeLists.txt
+# Warn if the user invokes CMake directly
 if (NOT SKBUILD)
-  message(WARNING "This CMake file should be executed via scikit-build. "
-                      "Please run\n$ pip install .")
+  message(WARNING "\
+  This CMake file is meant to be executed using 'scikit-build-core'.
+  Running it directly will almost certainly not produce the desired
+  result. If you are a user trying to install this package, use the
+  command below, which will install all necessary build dependencies,
+  compile the package in an isolated environment, and then install it.
+  =====================================================================
+   $ pip install .
+  =====================================================================
+  If you are a software developer, and this is your own package, then
+  it is usually much more efficient to install the build dependencies
+  in your environment once and use the following command that avoids
+  a costly creation of a new virtual environment at every compilation:
+  =====================================================================
+   $ pip install nanobind scikit-build-core[pyproject]
+   $ pip install --no-build-isolation -ve .
+  =====================================================================
+  You may optionally add -Ceditable.rebuild=true to auto-rebuild when
+  the package is imported. Otherwise, you need to rerun the above
+  after editing C++ files.")
 endif()
 
 #  Check if submodules have been checked out, or fail early
@@ -14,7 +32,6 @@ if (NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/ext/suitesparse-metis-for-wind
     "You probably did not clone the project with --recursive. It is possible to recover "
     "by invoking\n$ git submodule update --init --recursive")
 endif()
-
 
 if (SKBUILD)
   # Constrain FindPython to find the Python version used by scikit-build
@@ -53,7 +70,7 @@ nanobind_add_module(
   _cholespy_core NB_STATIC
 
   src/cholesky_solver.h      src/cholesky_solver.cpp
-  src/docstr.h               src/main.cpp)
+  src/docstr.h               src/cholespy_core.cpp)
 
 set_property(TARGET _cholespy_core PROPERTY POSITION_INDEPENDENT_CODE ON)
 set_property(TARGET metis PROPERTY POSITION_INDEPENDENT_CODE ON)

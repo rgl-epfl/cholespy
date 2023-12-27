@@ -9,9 +9,9 @@
 namespace nb = nanobind;
 
 template <typename Float>
-void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *docstr) {
+void declare_cholesky(nb::module_ &m, const char *docstr) {
     using Class = CholeskySolver<Float>;
-    std::string class_name = std::string("CholeskySolver") + typestr;
+    std::string class_name = std::string("CholeskySolver");
     nb::class_<Class>(m, class_name.c_str(), docstr)
         .def("__init__", [](Class *self,
                             uint32_t n_rows,
@@ -40,7 +40,6 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                 throw std::invalid_argument("All input tensors should be on the same device!");
 
             if (ii.device_type() == nb::device::cpu::value) {
-                // CPU init
                 new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type);
             } else
                 throw std::invalid_argument("Unsupported input device! Only CPU supported.");
@@ -76,18 +75,13 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
         doc_solve);
 }
 
-NB_MODULE(_cholespy_core, m_) {
-    (void) m_;
-
-    nb::module_ m = nb::module_::import_("cholespy");
-
+NB_MODULE(_cholespy_core, m) {
     nb::enum_<MatrixType>(m, "MatrixType", doc_matrix_type)
         .value("CSC", MatrixType::CSC)
         .value("CSR", MatrixType::CSR)
         .value("COO", MatrixType::COO);
 
-    declare_cholesky<float>(m, "F", doc_cholesky_f);
-    declare_cholesky<double>(m, "D", doc_cholesky_d);
+    declare_cholesky<double>(m, doc_cholesky_d);
 
 
 #ifdef VERSION_INFO
