@@ -1,7 +1,7 @@
 [project]
-name = "cholespy"
+name = "sksparse_minimal"
 version = "0.1"
-description = "A drop in replacement for sksparse for sparse cholseky factorization"
+description = "A drop in replacement for sksparse for sparse Cholseky factorization"
 readme = "README.md"
 requires-python = ">=3.8"
 keywords = ["cholesky", "sksparse"]
@@ -27,7 +27,8 @@ dev = ["check-manifest"]
 test = ["pytest", "tox"]
 
 [project.urls]
-"Homepage" = "https://github.com/tansey-lab/bayestme"
+"Homepage" = "https://github.com/tansey-lab/sksparse_minimal"
+"Bug Tracker" = "https://github.com/tansey-lab/sksparse_minimal/issues"
 
 [tool.scikit-build]
 # Protect the configuration against future changes in scikit-build-core

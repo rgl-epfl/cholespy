@@ -12,6 +12,7 @@ CHOLMOD_D = 6
 CHOLMOD_P = 7
 CHOLMOD_Pt = 8
 
+
 class SparseCholesky:
     def __init__(self, A):
         if not sparse.isspmatrix_csc(A):
@@ -19,11 +20,7 @@ class SparseCholesky:
 
         self._shape = A.shape[0]
 
-        self._solver = CholeskySolver(
-            self._shape,
-            A.indptr,
-            A.indices,
-            A.data)
+        self._solver = CholeskySolver(self._shape, A.indptr, A.indices, A.data)
 
     def _solve(self, b, method):
         res = np.zeros_like(b, dtype=np.float64)
@@ -59,4 +56,3 @@ class SparseCholesky:
 
     def P(self):
         return self.apply_P(np.arange(self._shape))
-
