@@ -1,5 +1,5 @@
 import numpy as np
-from cholespy.main import SparseCholesky
+from sksparse_minimal import SparseCholesky
 from scipy.sparse import csc_matrix
 
 

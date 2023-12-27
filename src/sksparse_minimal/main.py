@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import sparse
-from cholespy._cholespy_core import CholeskySolver
+from sksparse_minimal._cholespy_core import CholeskySolver
 
 CHOLMOD_A = 0
 CHOLMOD_LDLt = 1
