@@ -149,8 +149,7 @@ void csc_sum_duplicates(int n_rows, int &m_nnz, int **col_ptr, int **rows, doubl
 }
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu) : m_n(n_rows), m_nnz(nnz), m_cpu(cpu) {
-
+CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu, int strategy) : m_n(n_rows), m_nnz(nnz), m_cpu(cpu) {
 
     // Placeholders for the CSC matrix data
     int *col_ptr, *rows;
@@ -188,7 +187,7 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, dou
     }
 
     // Run the Cholesky factorization through CHOLMOD and run the analysis
-    factorize(col_ptr, rows, data);
+    factorize(col_ptr, rows, data, strategy);
 
     if (type != MatrixType::CSC) {
         free(col_ptr);
@@ -198,12 +197,12 @@ CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, dou
 }
 
 template <typename Float>
-void CholeskySolver<Float>::factorize(int *col_ptr, int *rows, double *data) {
+void CholeskySolver<Float>::factorize(int *col_ptr, int *rows, double *data, int strategy) {
     cholmod_sparse *A;
 
     cholmod_start(&m_common);
 
-    m_common.supernodal = CHOLMOD_SIMPLICIAL;
+    m_common.supernodal = strategy;
     m_common.final_ll = 1; // compute LL' factorization instead of LDL´ (default for simplicial)
     m_common.nmethods = 1;
     m_common.method[0].ordering = CHOLMOD_NESDIS;

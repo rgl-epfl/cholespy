@@ -32,8 +32,9 @@ public:
      * @param x Array of nonzero entries
      * @param type The type of the matrix representation. Can be COO, CSC or CSR
      * @param cpu Whether or not to run the CPU version of the solver.
+     * @param strategy 0: SIMPLICIAL, 1: AUTO, 2: SUPERNODAL
      */
-    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu);
+    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu, int strategy);
 
     ~CholeskySolver();
 
@@ -49,7 +50,7 @@ public:
 private:
 
     // Factorize the CSC matrix using CHOLMOD
-    void factorize(int *col_ptr, int *rows, double *data);
+    void factorize(int *col_ptr, int *rows, double *data, int strategy);
 
     // Run the analysis of a triangular matrix obtained through Cholesky
     void analyze_cuda(int n_rows, int n_entries, void *csr_rows, void *csr_cols, Float *csr_data, bool lower);
