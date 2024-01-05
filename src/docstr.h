@@ -16,6 +16,8 @@ Parameters
 - x - The array of nonzero entries.
 - type - The matrix representation type, of type MatrixType. Available types
          are MatrixType.COO, MatrixType.CSC and MatrixType.CSR.
+- strategy - the factorization strategy to be used by CHOLMOD. Available options are
+         0 (Simplicial), 1 (automatic selectiong, default), 2 (Supernodal).
 )";
 
 const char *doc_matrix_type =
