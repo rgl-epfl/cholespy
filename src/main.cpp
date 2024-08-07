@@ -20,9 +20,9 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
     nb::class_<Class>(m, class_name.c_str(), docstr)
         .def("__init__", [](Class *self,
                             uint32_t n_rows,
-                            nb::ndarray<int32_t, nb::shape<nb::any>, nb::c_contig> ii,
-                            nb::ndarray<int32_t, nb::shape<nb::any>, nb::c_contig> jj,
-                            nb::ndarray<double, nb::shape<nb::any>, nb::c_contig> x,
+                            nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> ii,
+                            nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> jj,
+                            nb::ndarray<double, nb::shape<-1>, nb::c_contig> x,
                             MatrixType type) {
 
             if (type == MatrixType::COO){
