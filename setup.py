@@ -19,7 +19,7 @@ readme = (this_directory / "README.md").read_text()
 
 setup(
     name="cholespy",
-    version="1.0.0",
+    version="2.0.0",
     description="A self-contained sparse Cholesky solver, compatible with CPU and GPU tensor frameworks.",
     author="Baptiste Nicolet",
     license="BSD",
