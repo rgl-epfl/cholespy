@@ -1,11 +1,43 @@
+# Following https://github.com/wjakob/nanobind_example/blob/master/pyproject.toml
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel",
-    "scikit-build==0.14.0",
-    "cmake>=3.18",
-    "nanobind>=2.0.0",
-    "ninja; platform_system!='Windows'"
+requires = ["scikit-build-core >=0.4.3", "nanobind >=2.0.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "cholespy"
+authors = [
+    {name = "Baptiste Nicolet", email = "baptiste.nicolet@epfl.ch"},
+]
+version = "2.0.0"
+description = "A self-contained sparse Cholesky solver, compatible with CPU and GPU tensor frameworks."
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["sparse", "Cholesky", "solver", "CUDA"]
+classifiers = [
+    "License :: OSI Approved :: BSD License",
 ]
 
-build-backend = "setuptools.build_meta"
+[project.urls]
+Homepage = "https://github.com/rgl-epfl/cholespy"
+
+[tool.scikit-build]
+# Protect the configuration against future changes in scikit-build-core
+minimum-version = "0.4"
+# Setuptools-style build caching in a local directory
+build-dir = "build/{wheel_tag}"
+# Build stable ABI wheels for CPython 3.12+
+wheel.py-api = "cp312"
+
+[tool.cibuildwheel]
+# Necessary to see build output from the actual compilation
+build-verbosity = 1
+# Run pytest to ensure that the package was correctly built
+test-command = "pytest {project}/tests"
+test-requires = "pytest"
+# Don't test Python 3.8 wheels on macOS/arm64
+test-skip="cp38-macosx_*:arm64"
+
+# needed for full c++17 support
+[tool.cibuildwheel.macos.environment]
+macosx_deployment_target = "10.14"
+
