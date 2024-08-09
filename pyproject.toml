@@ -8,7 +8,7 @@ name = "cholespy"
 authors = [
     {name = "Baptiste Nicolet", email = "baptiste.nicolet@epfl.ch"},
 ]
-version = "2.0.0"
+version = "2.1.0"
 description = "A self-contained sparse Cholesky solver, compatible with CPU and GPU tensor frameworks."
 readme = "README.md"
 requires-python = ">=3.8"
