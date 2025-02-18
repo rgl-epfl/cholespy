@@ -38,14 +38,22 @@ The Python bindings are generated with
 [nanobind](https://github.com/wjakob/nanobind), which makes it easily
 interoperable with most tensor frameworks (Numpy, PyTorch, JAX...)
 
+# What's different in cholespy_multiGPU?
+
+In original cholespy, only GPU cuda:0 is supported, since the deviceID 0 is hardcoded in
+cuDeviceGet() function. If you try to launch the solver on other GPU devices (e.g. cuda:1),
+you'll get an illegal memory access error in cuda kernel.
+
+cholespy_multiGPU adds support to multiGPU use. Now you can pass a deviceID parameter to 
+the python class CholeskySolverF/CholeskySolverD, the library will correctly initialize a
+cuda context on the specified cuda device.
+
+The following operations are now allowed:
+- Use CholeskySolver in different processes to process data on different GPU devices
+- Use some different CholeskySolver instances to process data on different GPU devices in a single process
+
 
 # Installing
-
-## With PyPI (recommended)
-
-```bash
-pip install cholespy
-```
 
 ## From source
 
@@ -100,6 +108,9 @@ below:
 `x` and `b` **must** have the same dtype as the solver used, i.e. `float32` for
 `CholeskySolverF` or `float64` for `CholeskySolverD`. Since `x` is modified in
 place, implicit type conversion is not supported.
+
+NOTE: x and b **must** have the same device as the solver (CPU or GPU device specified
+by deviceID)
 
 # Example usage
 
