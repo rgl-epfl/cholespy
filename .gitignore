@@ -7,7 +7,4 @@ __pycache__
 *.egg-info/
 _skbuild/
 
-SuiteSparse*
-.github*
-.pytest_cache*
 
