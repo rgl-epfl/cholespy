@@ -58,8 +58,8 @@ The following operations are now allowed:
 ## From source
 
 ```bash
-git clone --recursive https://github.com/rgl-epfl/cholespy
-pip install ./cholespy
+git clone --recursive https://github.com/mikiisayakaa/cholespy_multiGPU.git
+pip install ./cholespy_multiGPU
 ```
 
 # Documentation
