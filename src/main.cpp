@@ -47,6 +47,9 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
             if (ii.device_type() == nb::device::cuda::value) {
                 // GPU init
                 // Initialize CUDA and load the kernels if not already done
+                if (ii.device_id() != jj.device_id() || ii.device_id() != deviceID)
+                    throw std::invalid_argument("All input tensors should be on the same device!");
+
                 init_cuda(deviceID);
                 CUcontext cu_context = device_contexts[deviceID];
 
