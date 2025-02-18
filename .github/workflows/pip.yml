@@ -1,0 +1,41 @@
+name: Pip
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build with Pip
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest, macos-latest, ubuntu-latest]
+        python-version: ["3.8", "3.11"]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set min macOS version
+      if: runner.os == 'macOS'
+      run: |
+        echo "MACOS_DEPLOYMENT_TARGET=10.14" >> $GITHUB_ENV
+
+    - name: Build and install Cholespy
+      run: python -m pip install .
+
+    - name: Install test dependencies
+      run: python -m pip install pytest numpy scipy
+
+    - name: Test
+      run: python -m pytest tests
