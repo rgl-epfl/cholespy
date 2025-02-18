@@ -7,6 +7,7 @@ build-backend = "scikit_build_core.build"
 name = "cholespy"
 authors = [
     {name = "Baptiste Nicolet", email = "baptiste.nicolet@epfl.ch"},
+    {name = "Peng Yan", email = "1105012124@qq.com"},
 ]
 version = "2.1.0"
 description = "A self-contained sparse Cholesky solver, compatible with CPU and GPU tensor frameworks."
