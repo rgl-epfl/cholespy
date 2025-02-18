@@ -24,7 +24,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                             nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> jj,
                             nb::ndarray<double, nb::shape<-1>, nb::c_contig> x,
                             MatrixType type,
-                            uint32_t deviceID) {
+                            uint32_t deviceID = 0) {
             if (type == MatrixType::COO){
                 if (ii.shape(0) != jj.shape(0))
                     throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
@@ -76,7 +76,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
         nb::arg("jj"),
         nb::arg("x"),
         nb::arg("type"),
-        nb::arg("deviceID"),
+        nb::arg("deviceID") = 0,
         doc_constructor)
         .def("solve", [](Class &self,
                         nb::ndarray<Float, nb::c_contig> b,
