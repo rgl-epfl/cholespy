@@ -110,7 +110,7 @@ below:
 place, implicit type conversion is not supported.
 
 NOTE: x and b **must** have the same device as the solver (CPU or GPU device specified
-by deviceID)
+by deviceID), also **must** have the same device as ii, jj.
 
 # Example usage
 
