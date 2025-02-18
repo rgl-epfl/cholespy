@@ -84,6 +84,8 @@ below:
 - `x` - The array of nonzero entries.
 - `type` - The matrix representation type, of type `MatrixType`. Available types
   are `MatrixType.COO`, `MatrixType.CSC` and `MatrixType.CSR`.
+- `deviceID` - Used for device selection in multiGPU environment. It's an unsigned
+  int value, can be extracted from pytorch's device string like 'cuda:0' 'cuda:1'
 
 **`cholespy.CholeskySolverF.solve(b, x)`**
 
@@ -105,15 +107,18 @@ place, implicit type conversion is not supported.
 from cholespy import CholeskySolverF, MatrixType
 import torch
 
+device = 'cuda:1'
 # Identity matrix
 n_rows = 20
-rows = torch.arange(n_rows, device='cuda')
-cols = torch.arange(n_rows, device='cuda')
-data = torch.ones(n_rows, device='cuda')
+rows = torch.arange(n_rows, device=device)
+cols = torch.arange(n_rows, device=device)
+data = torch.ones(n_rows, device=device)
 
-solver = CholeskySolverF(n_rows, rows, cols, data, MatrixType.COO)
+deviceID = int(device.split(":")[1])
 
-b = torch.ones(n_rows, device='cuda')
+solver = CholeskySolverF(n_rows, rows, cols, data, MatrixType.COO, deviceID)
+
+b = torch.ones(n_rows, device=device)
 x = torch.zeros_like(b)
 
 solver.solve(b, x)
