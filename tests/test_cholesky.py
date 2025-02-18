@@ -29,7 +29,7 @@ def test_solver(device, variant, n_verts, faces):
     L_csc = sp.csc_matrix((values, idx))
     b = np.random.random(size=(n_verts, max(RHS))).astype(dtype)
     x= spsolve(L_csc, b)
-    solver = CholeskySolver(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO)
+    solver = CholeskySolver(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO, 0)
 
     # Test with different RHS
     for n_rhs in RHS:
@@ -68,19 +68,19 @@ def test_matrices(device):
     x_ref = spsolve(L_csc, b)
 
     # Test with COO input
-    solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO)
+    solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO, 0)
     solver.solve(b_torch, x_torch)
 
     assert(np.allclose(x_torch.cpu().numpy(), x_ref))
 
     # Test with CSR input
-    solver = CholeskySolverF(n_verts, torch.tensor(L_csr.indptr, device=device), torch.tensor(L_csr.indices, device=device), torch.tensor(L_csr.data, device=device), MatrixType.CSR)
+    solver = CholeskySolverF(n_verts, torch.tensor(L_csr.indptr, device=device), torch.tensor(L_csr.indices, device=device), torch.tensor(L_csr.data, device=device), MatrixType.CSR, 0)
     solver.solve(b_torch, x_torch)
 
     assert(np.allclose(x_torch.cpu().numpy(), x_ref))
 
     # Test with CSC input
-    solver = CholeskySolverF(n_verts, torch.tensor(L_csc.indptr, device=device), torch.tensor(L_csc.indices, device=device), torch.tensor(L_csc.data, device=device), MatrixType.CSC)
+    solver = CholeskySolverF(n_verts, torch.tensor(L_csc.indptr, device=device), torch.tensor(L_csc.indices, device=device), torch.tensor(L_csc.data, device=device), MatrixType.CSC, 0)
     solver.solve(b_torch, x_torch)
 
     assert(np.allclose(x_torch.cpu().numpy(), x_ref))
@@ -106,7 +106,7 @@ def test_frameworks(framework):
 
     # Test with Numpy
     if framework == "numpy":
-        solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO)
+        solver = CholeskySolverF(n_verts, idx[0], idx[1], values, MatrixType.COO, 0)
 
         x = np.zeros_like(b)
         solver.solve(b, x)
@@ -115,7 +115,7 @@ def test_frameworks(framework):
     elif framework == "torch":
         import torch
         # Test with PyTorch - CPU
-        solver = CholeskySolverF(n_verts, torch.tensor(idx[0]), torch.tensor(idx[1]), torch.tensor(values), MatrixType.COO)
+        solver = CholeskySolverF(n_verts, torch.tensor(idx[0]), torch.tensor(idx[1]), torch.tensor(values), MatrixType.COO, 0)
 
         b_torch = torch.tensor(b)
         x_torch = torch.zeros_like(b_torch)
@@ -124,7 +124,7 @@ def test_frameworks(framework):
 
         # Test with PyTorch - CUDA
         if torch.cuda.device_count() > 0:
-            solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO)
+            solver = CholeskySolverF(n_verts, torch.tensor(idx[0], device='cuda'), torch.tensor(idx[1], device='cuda'), torch.tensor(values, device='cuda'), MatrixType.COO, 0)
 
             b_torch = torch.tensor(b, device='cuda')
             x_torch = torch.zeros_like(b_torch)
@@ -139,7 +139,7 @@ def test_frameworks(framework):
             tf.config.experimental.set_memory_growth(gpu, True)
         # Test with TensorFlow - CPU
         with tf.device('/device:cpu:0'):
-            solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
+            solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO, 0)
 
             b_tf = tf.convert_to_tensor(b)
             x_tf = tf.zeros_like(b_tf)
@@ -149,7 +149,7 @@ def test_frameworks(framework):
         if len(gpus) > 0:
             # Test with TensorFlow - CUDA
             with tf.device('/device:gpu:0'):
-                solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO)
+                solver = CholeskySolverF(n_verts, tf.convert_to_tensor(idx[0]), tf.convert_to_tensor(idx[1]), tf.convert_to_tensor(values), MatrixType.COO, 0)
 
                 b_tf = tf.convert_to_tensor(b)
                 x_tf = tf.zeros_like(b_tf)
@@ -163,7 +163,7 @@ def test_frameworks(framework):
         import jax
         with jax.experimental.enable_x64():
             # Test with JAX
-            solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
+            solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO, 0)
 
             b_jax= jax.numpy.array(b)
             x_jax = jax.numpy.zeros_like(b_jax)
@@ -173,7 +173,7 @@ def test_frameworks(framework):
     elif framework == "cupy":
         import cupy as cp
         # Test with CuPy
-        solver = CholeskySolverF(n_verts, cp.array(idx[0], dtype=cp.int32), cp.array(idx[1], dtype=cp.int32), cp.array(values, dtype=cp.float64), MatrixType.COO)
+        solver = CholeskySolverF(n_verts, cp.array(idx[0], dtype=cp.int32), cp.array(idx[1], dtype=cp.int32), cp.array(values, dtype=cp.float64), MatrixType.COO, 0)
 
         b_cp = cp.array(b)
         x_cp = cp.zeros_like(b_cp)
@@ -183,7 +183,7 @@ def test_frameworks(framework):
     elif framework == "drjit":
         import drjit
         # Test with DrJIT - CUDA
-        solver = CholeskySolverF(n_verts, drjit.cuda.TensorXi(idx[0]), drjit.cuda.TensorXi(idx[1]), drjit.cuda.TensorXf64(values), MatrixType.COO)
+        solver = CholeskySolverF(n_verts, drjit.cuda.TensorXi(idx[0]), drjit.cuda.TensorXi(idx[1]), drjit.cuda.TensorXf64(values), MatrixType.COO, 0)
 
         b_drjit = drjit.cuda.TensorXf(b)
         x_drjit = drjit.zeros(drjit.cuda.TensorXf, b.shape)
@@ -191,9 +191,93 @@ def test_frameworks(framework):
         assert(np.allclose(x_drjit.numpy(), x_ref))
 
         # Test with DrJIT - CPU
-        solver = CholeskySolverF(n_verts, drjit.llvm.TensorXi(idx[0]), drjit.llvm.TensorXi(idx[1]), drjit.llvm.TensorXf64(values), MatrixType.COO)
+        solver = CholeskySolverF(n_verts, drjit.llvm.TensorXi(idx[0]), drjit.llvm.TensorXi(idx[1]), drjit.llvm.TensorXf64(values), MatrixType.COO, 0)
 
         b_drjit = drjit.llvm.TensorXf(b)
         x_drjit = drjit.zeros(drjit.llvm.TensorXf, b.shape)
         solver.solve(b_drjit, x_drjit)
         assert(np.allclose(x_drjit.numpy(), x_ref))
+        
+@pytest.mark.parametrize("n_verts, faces", [get_cube(), get_icosphere(3), get_icosphere(5)])
+@pytest.mark.parametrize("variant", ["float", "double"])
+@pytest.mark.parametrize("device", ["cuda:0", "cuda:1", "cuda:2", "cuda:3"])
+def test_solver_mgpu(device, variant, n_verts, faces):
+    try:
+        import torch
+    except ModuleNotFoundError:
+        pytest.skip("PyTorch was not found!")
+        
+    deviceID = int(device.split(":")[1])
+    if torch.cuda.device_count() <= deviceID:
+        pytest.skip(f"No GPU with ID {device}")
+
+    np.random.seed(45)
+    CholeskySolver = CholeskySolverF if variant == "float" else CholeskySolverD
+    dtype = np.float32 if variant == "float" else np.float64
+
+    lambda_ = 2.0
+    values, idx = get_coo_arrays(n_verts, faces, lambda_)
+
+    L_csc = sp.csc_matrix((values, idx))
+    b = np.random.random(size=(n_verts, max(RHS))).astype(dtype)
+    x= spsolve(L_csc, b)
+    solver = CholeskySolver(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO, deviceID)
+
+    # Test with different RHS
+    for n_rhs in RHS:
+        b_crop = b[:, :n_rhs]
+        b_torch = torch.tensor(b_crop, device=device)
+        x_torch = torch.zeros_like(b_torch)
+        try:
+            solver.solve(b_torch, x_torch)
+            assert(np.allclose(x_torch.cpu().numpy(), x[:, :n_rhs]))
+        except ValueError as e:
+            assert n_rhs > 128
+            assert e.__str__() == "The number of RHS should be less than 128."
+            
+@pytest.mark.parametrize("n_verts, faces", [get_cube()])
+@pytest.mark.parametrize("variant", ["float", "double"])
+@pytest.mark.parametrize("device", ["cuda:0", "cuda:1", "cuda:2", "cuda:3"])
+def test_solver_mgpu_mix(device, variant, n_verts, faces):
+    try:
+        import torch
+    except ModuleNotFoundError:
+        pytest.skip("PyTorch was not found!")
+    
+    deviceIDs = []
+    for d in device:    
+        deviceID = int(device.split(":")[1])
+        if torch.cuda.device_count() <= deviceID:
+            continue
+        else:
+            deviceIDs.append(deviceID)
+
+    np.random.seed(45)
+    CholeskySolver = CholeskySolverF if variant == "float" else CholeskySolverD
+    dtype = np.float32 if variant == "float" else np.float64
+
+    lambda_ = 2.0
+    values, idx = get_coo_arrays(n_verts, faces, lambda_)
+
+    L_csc = sp.csc_matrix((values, idx))
+    b = np.random.random(size=(n_verts, max(RHS))).astype(dtype)
+    x= spsolve(L_csc, b)
+    solvers = []
+    for deviceID in deviceIDs:
+        solver = CholeskySolver(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO, deviceID)
+        solvers.append(solver)
+
+    # Test with different RHS
+    for n_rhs in RHS:
+        for idx, deviceID in enumerate(deviceIDs):
+            solver = solvers[idx]
+            device = "cuda:" + str(deviceID)
+            b_crop = b[:, :n_rhs]
+            b_torch = torch.tensor(b_crop, device=device)
+            x_torch = torch.zeros_like(b_torch)
+            try:
+                solver.solve(b_torch, x_torch)
+                assert(np.allclose(x_torch.cpu().numpy(), x[:, :n_rhs]))
+            except ValueError as e:
+                assert n_rhs > 128
+                assert e.__str__() == "The number of RHS should be less than 128."
