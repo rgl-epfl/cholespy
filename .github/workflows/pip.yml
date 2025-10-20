@@ -26,6 +26,10 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
+    - name: Install BLAS and LAPACK
+      if: runner.os == 'Linux'
+      run: sudo apt-get update && sudo apt-get install -y liblapack-dev
+
     - name: Set min macOS version
       if: runner.os == 'macOS'
       run: |
