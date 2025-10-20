@@ -33,7 +33,7 @@ jobs:
     - name: Check metadata
       run: pipx run twine check dist/*
 
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v4
       with:
         path: dist/*.tar.gz
 
@@ -60,7 +60,7 @@ jobs:
       run: pipx run twine check wheelhouse/*
 
     - name: Upload wheels
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         path: wheelhouse/*.whl
 
@@ -73,7 +73,7 @@ jobs:
     steps:
     - uses: actions/setup-python@v2
 
-    - uses: actions/download-artifact@v2
+    - uses: actions/download-artifact@v5
       with:
         name: artifact
         path: dist
