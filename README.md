@@ -38,20 +38,28 @@ The Python bindings are generated with
 [nanobind](https://github.com/wjakob/nanobind), which makes it easily
 interoperable with most tensor frameworks (Numpy, PyTorch, JAX...)
 
+# What's different in cholespy_multiGPU?
+
+In original cholespy, only GPU cuda:0 is supported, since the deviceID 0 is hardcoded in
+cuDeviceGet() function. If you try to launch the solver on other GPU devices (e.g. cuda:1),
+you'll get an illegal memory access error in cuda kernel.
+
+cholespy_multiGPU adds support to multiGPU use. Now you can pass a deviceID parameter to 
+the python class CholeskySolverF/CholeskySolverD, the library will correctly initialize a
+cuda context on the specified cuda device.
+
+The following operations are now allowed:
+- Use CholeskySolver in different processes to process data on different GPU devices
+- Use some different CholeskySolver instances to process data on different GPU devices in a single process
+
 
 # Installing
-
-## With PyPI (recommended)
-
-```bash
-pip install cholespy
-```
 
 ## From source
 
 ```bash
-git clone --recursive https://github.com/rgl-epfl/cholespy
-pip install ./cholespy
+git clone --recursive https://github.com/mikiisayakaa/cholespy_multiGPU.git
+pip install ./cholespy_multiGPU
 ```
 
 # Documentation
@@ -84,6 +92,8 @@ below:
 - `x` - The array of nonzero entries.
 - `type` - The matrix representation type, of type `MatrixType`. Available types
   are `MatrixType.COO`, `MatrixType.CSC` and `MatrixType.CSR`.
+- `deviceID` - Used for device selection in multiGPU environment. It's an unsigned
+  int value, can be extracted from pytorch's device string like 'cuda:0' 'cuda:1'
 
 **`cholespy.CholeskySolverF.solve(b, x)`**
 
@@ -99,21 +109,27 @@ below:
 `CholeskySolverF` or `float64` for `CholeskySolverD`. Since `x` is modified in
 place, implicit type conversion is not supported.
 
+NOTE: x and b **must** have the same device as the solver (CPU or GPU device specified
+by deviceID), also **must** have the same device as ii, jj.
+
 # Example usage
 
 ```python
 from cholespy import CholeskySolverF, MatrixType
 import torch
 
+device = 'cuda:1'
 # Identity matrix
 n_rows = 20
-rows = torch.arange(n_rows, device='cuda')
-cols = torch.arange(n_rows, device='cuda')
-data = torch.ones(n_rows, device='cuda')
+rows = torch.arange(n_rows, device=device)
+cols = torch.arange(n_rows, device=device)
+data = torch.ones(n_rows, device=device)
 
-solver = CholeskySolverF(n_rows, rows, cols, data, MatrixType.COO)
+deviceID = int(device.split(":")[1])
 
-b = torch.ones(n_rows, device='cuda')
+solver = CholeskySolverF(n_rows, rows, cols, data, MatrixType.COO, deviceID)
+
+b = torch.ones(n_rows, device=device)
 x = torch.zeros_like(b)
 
 solver.solve(b, x)

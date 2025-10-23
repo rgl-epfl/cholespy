@@ -197,3 +197,87 @@ def test_frameworks(framework):
         x_drjit = drjit.zeros(drjit.llvm.TensorXf, b.shape)
         solver.solve(b_drjit, x_drjit)
         assert(np.allclose(x_drjit.numpy(), x_ref))
+        
+@pytest.mark.parametrize("n_verts, faces", [get_cube(), get_icosphere(3), get_icosphere(5)])
+@pytest.mark.parametrize("variant", ["float", "double"])
+@pytest.mark.parametrize("device", ["cuda:0", "cuda:1", "cuda:2", "cuda:3"])
+def test_solver_mgpu(device, variant, n_verts, faces):
+    try:
+        import torch
+    except ModuleNotFoundError:
+        pytest.skip("PyTorch was not found!")
+        
+    deviceID = int(device.split(":")[1])
+    if torch.cuda.device_count() <= deviceID:
+        pytest.skip(f"No GPU with ID {device}")
+
+    np.random.seed(45)
+    CholeskySolver = CholeskySolverF if variant == "float" else CholeskySolverD
+    dtype = np.float32 if variant == "float" else np.float64
+
+    lambda_ = 2.0
+    values, idx = get_coo_arrays(n_verts, faces, lambda_)
+
+    L_csc = sp.csc_matrix((values, idx))
+    b = np.random.random(size=(n_verts, max(RHS))).astype(dtype)
+    x= spsolve(L_csc, b)
+    solver = CholeskySolver(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO, deviceID)
+
+    # Test with different RHS
+    for n_rhs in RHS:
+        b_crop = b[:, :n_rhs]
+        b_torch = torch.tensor(b_crop, device=device)
+        x_torch = torch.zeros_like(b_torch)
+        try:
+            solver.solve(b_torch, x_torch)
+            assert(np.allclose(x_torch.cpu().numpy(), x[:, :n_rhs]))
+        except ValueError as e:
+            assert n_rhs > 128
+            assert e.__str__() == "The number of RHS should be less than 128."
+            
+@pytest.mark.parametrize("n_verts, faces", [get_cube()])
+@pytest.mark.parametrize("variant", ["float", "double"])
+@pytest.mark.parametrize("device", ["cuda:0", "cuda:1", "cuda:2", "cuda:3"])
+def test_solver_mgpu_mix(device, variant, n_verts, faces):
+    try:
+        import torch
+    except ModuleNotFoundError:
+        pytest.skip("PyTorch was not found!")
+    
+    deviceIDs = []
+    for d in device:    
+        deviceID = int(device.split(":")[1])
+        if torch.cuda.device_count() <= deviceID:
+            continue
+        else:
+            deviceIDs.append(deviceID)
+
+    np.random.seed(45)
+    CholeskySolver = CholeskySolverF if variant == "float" else CholeskySolverD
+    dtype = np.float32 if variant == "float" else np.float64
+
+    lambda_ = 2.0
+    values, idx = get_coo_arrays(n_verts, faces, lambda_)
+
+    L_csc = sp.csc_matrix((values, idx))
+    b = np.random.random(size=(n_verts, max(RHS))).astype(dtype)
+    x= spsolve(L_csc, b)
+    solvers = []
+    for deviceID in deviceIDs:
+        solver = CholeskySolver(n_verts, torch.tensor(idx[0], device=device), torch.tensor(idx[1], device=device), torch.tensor(values, device=device), MatrixType.COO, deviceID)
+        solvers.append(solver)
+
+    # Test with different RHS
+    for n_rhs in RHS:
+        for idx, deviceID in enumerate(deviceIDs):
+            solver = solvers[idx]
+            device = "cuda:" + str(deviceID)
+            b_crop = b[:, :n_rhs]
+            b_torch = torch.tensor(b_crop, device=device)
+            x_torch = torch.zeros_like(b_torch)
+            try:
+                solver.solve(b_torch, x_torch)
+                assert(np.allclose(x_torch.cpu().numpy(), x[:, :n_rhs]))
+            except ValueError as e:
+                assert n_rhs > 128
+                assert e.__str__() == "The number of RHS should be less than 128."
