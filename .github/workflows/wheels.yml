@@ -9,8 +9,8 @@ on:
 env:
   CIBW_TEST_COMMAND: pytest {project}/tests
   CIBW_TEST_REQUIRES: pytest numpy scipy
-  CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-  CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
+  CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
+  CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
   CIBW_SKIP: "*-win32 *_i686 pp* *-musllinux* cp38-*" # Skip PyPy, 32-bit builds, musl linux, Python 3.8
   CIBW_BEFORE_ALL_LINUX: "yum install -y lapack-devel"
   CIBW_ARCHS_WINDOWS: auto64
@@ -35,6 +35,7 @@ jobs:
 
     - uses: actions/upload-artifact@v4
       with:
+        name: sdist
         path: dist/*.tar.gz
 
   build_wheels:
@@ -62,6 +63,7 @@ jobs:
     - name: Upload wheels
       uses: actions/upload-artifact@v4
       with:
+        name: wheels-${{ matrix.os }}
         path: wheelhouse/*.whl
 
   upload_all:
@@ -75,8 +77,8 @@ jobs:
 
     - uses: actions/download-artifact@v5
       with:
-        name: artifact
         path: dist
+        merge-multiple: true
 
     - uses: pypa/gh-action-pypi-publish@v1.13.0
       with:
