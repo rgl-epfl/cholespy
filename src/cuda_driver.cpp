@@ -55,7 +55,7 @@ void cuda_check_impl(CUresult errval, const char *file, const int line) {
     }
 }
 
-bool init_cuda() {
+bool init_cuda(int device_id) {
 
     if (handle)
         return true;
@@ -121,7 +121,7 @@ bool init_cuda() {
     }
 
     cuda_check(cuInit(0));
-    cuda_check(cuDeviceGet(&cu_device, 0));
+    cuda_check(cuDeviceGet(&cu_device, device_id));
     cuda_check(cuDevicePrimaryCtxRetain(&cu_context, cu_device));
     cuda_check(cuCtxPushCurrent(cu_context));
     cuda_check(cuModuleLoadData(&cu_module, (void *) imageBytes));

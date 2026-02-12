@@ -47,7 +47,7 @@ extern CUfunction solve_lower_double;
 extern CUfunction analysis_lower;
 extern CUfunction analysis_upper;
 
-extern bool init_cuda();
+extern bool init_cuda(int device_id);
 extern void shutdown_cuda();
 extern void cuda_check_impl(CUresult errval, const char *file, const int line);
 

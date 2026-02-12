@@ -48,7 +48,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                 // GPU init
 
                 // Initialize CUDA and load the kernels if not already done
-                init_cuda();
+                init_cuda(ii.device_id());
 
                 scoped_set_context guard(cu_context);
 
