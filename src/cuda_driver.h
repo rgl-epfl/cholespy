@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdio>
+#include <cstdint>
+#include <unordered_map>
 using size_t = std::size_t;
 
 #define CUDA_ERROR_DEINITIALIZED 4
@@ -33,21 +35,22 @@ extern CUresult (*cuModuleLoadData)(CUmodule *, const void *);
 extern CUresult (*cuModuleUnload)(CUmodule);
 extern CUresult (*cuCtxPushCurrent)(CUcontext);
 extern CUresult (*cuCtxPopCurrent)(CUcontext*);
+extern CUresult (*cuCtxGetDevice)(CUdevice*);
 
 /// Assert that a CUDA operation is correctly issue
 #define cuda_check(err) cuda_check_impl(err, __FILE__, __LINE__)
 
-extern CUdevice cu_device;
-extern CUcontext cu_context;
-extern CUmodule cu_module;
-extern CUfunction solve_upper_float;
-extern CUfunction solve_upper_double;
-extern CUfunction solve_lower_float;
-extern CUfunction solve_lower_double;
-extern CUfunction analysis_lower;
-extern CUfunction analysis_upper;
+extern std::unordered_map<uint32_t, CUcontext> device_contexts;
+extern std::unordered_map<uint32_t, CUdevice> device_devices;
+extern std::unordered_map<uint32_t, CUmodule> device_modules;
+extern std::unordered_map<uint32_t, CUfunction> device_solve_upper_float;
+extern std::unordered_map<uint32_t, CUfunction> device_solve_upper_double;
+extern std::unordered_map<uint32_t, CUfunction> device_solve_lower_float;
+extern std::unordered_map<uint32_t, CUfunction> device_solve_lower_double;
+extern std::unordered_map<uint32_t, CUfunction> device_analysis_lower;
+extern std::unordered_map<uint32_t, CUfunction> device_analysis_upper;
 
-extern bool init_cuda();
+extern bool init_cuda(uint32_t deviceID);
 extern void shutdown_cuda();
 extern void cuda_check_impl(CUresult errval, const char *file, const int line);
 

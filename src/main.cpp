@@ -23,8 +23,8 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                             nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> ii,
                             nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> jj,
                             nb::ndarray<double, nb::shape<-1>, nb::c_contig> x,
-                            MatrixType type) {
-
+                            MatrixType type,
+                            uint32_t deviceID = 0) {
             if (type == MatrixType::COO){
                 if (ii.shape(0) != jj.shape(0))
                     throw std::invalid_argument("Sparse COO matrix: the two index arrays should have the same size.");
@@ -46,9 +46,12 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
 
             if (ii.device_type() == nb::device::cuda::value) {
                 // GPU init
-
                 // Initialize CUDA and load the kernels if not already done
-                init_cuda();
+                if (ii.device_id() != jj.device_id() || ii.device_id() != deviceID)
+                    throw std::invalid_argument("All input tensors should be on the same device!");
+
+                init_cuda(deviceID);
+                CUcontext cu_context = device_contexts[deviceID];
 
                 scoped_set_context guard(cu_context);
 
@@ -60,14 +63,14 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                 cuda_check(cuMemcpyAsync((CUdeviceptr) indices_b, (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
                 cuda_check(cuMemcpyAsync((CUdeviceptr) data, (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
 
-                new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false);
+                new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false, deviceID);
 
                 free(indices_a);
                 free(indices_b);
                 free(data);
             } else if (ii.device_type() == nb::device::cpu::value) {
                 // CPU init
-                new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true);
+                new (self) Class(n_rows, x.shape(0), (int *) ii.data(), (int *) jj.data(), (double *) x.data(), type, true, 0);
             } else
                 throw std::invalid_argument("Unsupported input device! Only CPU and CUDA arrays are supported.");
         },
@@ -76,6 +79,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
         nb::arg("jj"),
         nb::arg("x"),
         nb::arg("type"),
+        nb::arg("deviceID") = 0,
         doc_constructor)
         .def("solve", [](Class &self,
                         nb::ndarray<Float, nb::c_contig> b,
@@ -98,7 +102,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
             else if (b.device_type() == nb::device::cuda::value) {
                 if (self.is_cpu())
                     throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
-
+                CUcontext cu_context = device_contexts[self.get_deviceID()];
                 scoped_set_context guard(cu_context);
                 self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
             }

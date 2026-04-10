@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <vector>
+#include <cstdint>
 #include "cholmod.h"
 #include "cuda_driver.h"
 
@@ -32,8 +33,9 @@ public:
      * @param x Array of nonzero entries
      * @param type The type of the matrix representation. Can be COO, CSC or CSR
      * @param cpu Whether or not to run the CPU version of the solver.
+     * @param deviceID Specify cuda device ID
      */
-    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu);
+    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu, uint32_t deviceID);
 
     ~CholeskySolver();
 
@@ -45,6 +47,7 @@ public:
 
     // Return whether the solver solves on the CPU or on the GPU
     bool is_cpu() { return m_cpu; };
+    uint32_t get_deviceID() {return m_deviceID;}
 
 private:
 
@@ -60,6 +63,8 @@ private:
     int m_nrhs = 0;
     int m_n;
     int m_nnz;
+
+    uint32_t m_deviceID = 0;
 
     // CPU or GPU solver?
     bool m_cpu;
