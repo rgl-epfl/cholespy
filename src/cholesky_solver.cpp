@@ -429,6 +429,10 @@ void CholeskySolver<Float>::solve_cuda(int n_rhs, CUdeviceptr b, CUdeviceptr x) 
     launch_kernel(true, b);
     // Solve upper
     launch_kernel(false, x);
+
+    // Block until stream 0 is done so the result in x is visible to other CUDA
+    // streams (e.g. JAX's per-thread non-blocking streams) before we return.
+    cuda_check(cuStreamSynchronize(0));
 }
 
 template<typename Float>

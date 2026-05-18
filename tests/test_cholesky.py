@@ -161,14 +161,28 @@ def test_frameworks(framework):
         # Prevent JAX from allocating all GPU mrmory for itself
         os.environ['XLA_PYTHON_CLIENT_PREALLOCATE'] = "false"
         import jax
-        with jax.experimental.enable_x64():
-            # Test with JAX
-            solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
+        jax.config.update('jax_enable_x64', True)
+        # Test with JAX
+        solver = CholeskySolverF(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
 
-            b_jax= jax.numpy.array(b)
-            x_jax = jax.numpy.zeros_like(b_jax)
-            solver.solve(b_jax, x_jax)
-            assert(np.allclose(x_jax, x_ref))
+        b_jax= jax.numpy.array(b)
+        x_jax = jax.numpy.zeros_like(b_jax)
+        solver.solve(b_jax, x_jax)
+        assert(np.allclose(x_jax, x_ref))
+
+        # Test iterative solve on GPU: verify async dispatch doesn't cause stale reads
+        if jax.default_backend() == 'gpu':
+            @jax.jit
+            def normalize(v):
+                return v / jax.numpy.linalg.norm(v)
+
+            solver_d = CholeskySolverD(n_verts, jax.numpy.array(idx[0]), jax.numpy.array(idx[1]), jax.numpy.array(values, dtype=np.float64), MatrixType.COO)
+            b_iter = jax.numpy.array(b[:, 0], dtype=np.float64)
+            for _ in range(5):
+                x_iter = jax.numpy.zeros_like(b_iter)
+                solver_d.solve(b_iter, x_iter)
+                b_iter = normalize(x_iter)
+            assert not jax.numpy.any(jax.numpy.isnan(b_iter)), "NaN detected: JAX async dispatch race not fixed"
 
     elif framework == "cupy":
         import cupy as cp
