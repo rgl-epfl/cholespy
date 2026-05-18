@@ -34,6 +34,7 @@ CUresult (*cuModuleLoadData)(CUmodule *, const void *) = nullptr;
 CUresult (*cuModuleUnload)(CUmodule) = nullptr;
 CUresult (*cuCtxPushCurrent)(CUcontext) = nullptr;
 CUresult (*cuCtxPopCurrent)(CUcontext*) = nullptr;
+CUresult (*cuStreamSynchronize)(CUstream) = nullptr;
 
 CUdevice cu_device;
 CUcontext cu_context;
@@ -111,6 +112,7 @@ bool init_cuda() {
         LOAD(cuModuleGetFunction);
         LOAD(cuModuleLoadData);
         LOAD(cuModuleUnload);
+        LOAD(cuStreamSynchronize);
     } while (false);
 
     if (symbol) {

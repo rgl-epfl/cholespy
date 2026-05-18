@@ -33,6 +33,7 @@ extern CUresult (*cuModuleLoadData)(CUmodule *, const void *);
 extern CUresult (*cuModuleUnload)(CUmodule);
 extern CUresult (*cuCtxPushCurrent)(CUcontext);
 extern CUresult (*cuCtxPopCurrent)(CUcontext*);
+extern CUresult (*cuStreamSynchronize)(CUstream);
 
 /// Assert that a CUDA operation is correctly issue
 #define cuda_check(err) cuda_check_impl(err, __FILE__, __LINE__)
