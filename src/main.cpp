@@ -20,9 +20,9 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
     nb::class_<Class>(m, class_name.c_str(), docstr)
         .def("__init__", [](Class *self,
                             uint32_t n_rows,
-                            nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> ii,
-                            nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig> jj,
-                            nb::ndarray<double, nb::shape<-1>, nb::c_contig> x,
+                            nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig, nb::ro> ii,
+                            nb::ndarray<int32_t, nb::shape<-1>, nb::c_contig, nb::ro> jj,
+                            nb::ndarray<double, nb::shape<-1>, nb::c_contig, nb::ro> x,
                             MatrixType type) {
 
             if (type == MatrixType::COO){
@@ -78,7 +78,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
         nb::arg("type"),
         doc_constructor)
         .def("solve", [](Class &self,
-                        nb::ndarray<Float, nb::c_contig> b,
+                        nb::ndarray<Float, nb::c_contig, nb::ro> b,
                         nb::ndarray<Float, nb::c_contig> x){
             if (b.ndim() != 1 && b.ndim() != 2)
                 throw std::invalid_argument("Expected 1D or 2D tensors as input.");
@@ -124,9 +124,9 @@ NB_MODULE(_cholespy_core, m_) {
     declare_cholesky<double>(m, "D", doc_cholesky_d);
 
     // Custom object to gracefully shutdown CUDA when unloading the module
-    nb::detail::keep_alive(m.ptr(),
-                           (void *) 1, // Unused payload
-                           [](void *p) noexcept { shutdown_cuda(); });
+    nb::keep_alive_cb(m,
+                      (void *) 1, // Unused payload
+                      [](void *p) noexcept { shutdown_cuda(); });
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
