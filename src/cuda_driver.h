@@ -14,6 +14,7 @@ using CUdevice     = int;
 using CUdeviceptr  = void *;
 
 extern CUresult (*cuDeviceGet)(CUdevice *, int);
+extern CUresult (*cuDeviceGetCount)(int *);
 extern CUresult (*cuDevicePrimaryCtxRelease)(CUdevice);
 extern CUresult (*cuDevicePrimaryCtxRetain)(CUcontext *, CUdevice);
 extern CUresult (*cuGetErrorName)(CUresult, const char **);
@@ -37,17 +38,27 @@ extern CUresult (*cuCtxPopCurrent)(CUcontext*);
 /// Assert that a CUDA operation is correctly issue
 #define cuda_check(err) cuda_check_impl(err, __FILE__, __LINE__)
 
-extern CUdevice cu_device;
-extern CUcontext cu_context;
-extern CUmodule cu_module;
-extern CUfunction solve_upper_float;
-extern CUfunction solve_upper_double;
-extern CUfunction solve_lower_float;
-extern CUfunction solve_lower_double;
-extern CUfunction analysis_lower;
-extern CUfunction analysis_upper;
+/// Per-GPU driver state: the device's primary context and the solver kernels
+/// loaded into it. CUDA modules/functions are context specific, so every
+/// device a solver runs on needs its own copy.
+struct CudaDeviceState {
+    int ordinal = -1;
+    CUdevice device = 0;
+    CUcontext context = nullptr;
+    CUmodule module = nullptr;
+    CUfunction solve_upper_float = nullptr;
+    CUfunction solve_upper_double = nullptr;
+    CUfunction solve_lower_float = nullptr;
+    CUfunction solve_lower_double = nullptr;
+    CUfunction analysis_lower = nullptr;
+    CUfunction analysis_upper = nullptr;
+};
 
+/// Load the CUDA driver library and its entry points (idempotent)
 extern bool init_cuda();
+/// State for device `ordinal`, retaining its primary context and loading the
+/// kernels on first use. Throws if CUDA is unavailable or the ordinal invalid.
+extern CudaDeviceState &cuda_device_state(int ordinal);
 extern void shutdown_cuda();
 extern void cuda_check_impl(CUresult errval, const char *file, const int line);
 

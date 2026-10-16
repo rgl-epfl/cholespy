@@ -45,12 +45,13 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                 throw std::invalid_argument("All input tensors should be on the same device!");
 
             if (ii.device_type() == nb::device::cuda::value) {
-                // GPU init
+                // GPU init: the solver lives on the device holding the input arrays
+                const int device = (int) ii.device_id();
+                if ((int) jj.device_id() != device || (int) x.device_id() != device)
+                    throw std::invalid_argument("All input tensors should be on the same CUDA device!");
 
-                // Initialize CUDA and load the kernels if not already done
-                init_cuda();
-
-                scoped_set_context guard(cu_context);
+                CudaDeviceState &state = cuda_device_state(device);
+                scoped_set_context guard(state.context);
 
                 int *indices_a = (int *) malloc(ii.shape(0)*sizeof(int));
                 int *indices_b = (int *) malloc(jj.shape(0)*sizeof(int));
@@ -60,7 +61,7 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
                 cuda_check(cuMemcpyAsync((CUdeviceptr) indices_b, (CUdeviceptr) jj.data(), jj.shape(0)*sizeof(int), 0));
                 cuda_check(cuMemcpyAsync((CUdeviceptr) data, (CUdeviceptr) x.data(), x.shape(0)*sizeof(double), 0));
 
-                new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false);
+                new (self) Class(n_rows, x.shape(0), indices_a, indices_b, data, type, false, device);
 
                 free(indices_a);
                 free(indices_b);
@@ -98,8 +99,12 @@ void declare_cholesky(nb::module_ &m, const std::string &typestr, const char *do
             else if (b.device_type() == nb::device::cuda::value) {
                 if (self.is_cpu())
                     throw std::invalid_argument("Input device is CUDA but the solver was initialized for CPU.");
+                if ((int) b.device_id() != self.device() || (int) x.device_id() != self.device())
+                    throw std::invalid_argument(
+                        "The solver was built on cuda:" + std::to_string(self.device()) + " but b is on cuda:" +
+                        std::to_string(b.device_id()) + " and x on cuda:" + std::to_string(x.device_id()) + ".");
 
-                scoped_set_context guard(cu_context);
+                scoped_set_context guard(self.cuda_state().context);
                 self.solve_cuda(b.ndim()==2 ? b.shape(1) : 1, (CUdeviceptr) b.data(), (CUdeviceptr) x.data());
             }
             else
