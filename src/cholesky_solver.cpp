@@ -149,7 +149,11 @@ void csc_sum_duplicates(int n_rows, int &m_nnz, int **col_ptr, int **rows, doubl
 }
 
 template <typename Float>
-CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu) : m_n(n_rows), m_nnz(nnz), m_cpu(cpu) {
+CholeskySolver<Float>::CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu, int device) : m_n(n_rows), m_nnz(nnz), m_cpu(cpu) {
+    if (!m_cpu) {
+        m_device = device;
+        m_cuda = &cuda_device_state(device);
+    }
 
 
     // Placeholders for the CSC matrix data
@@ -332,7 +336,7 @@ void CholeskySolver<Float>::analyze_cuda(int n_rows, int n_entries, void *csr_ro
         cols_d
     };
 
-    CUfunction analysis_kernel = (lower ? analysis_lower : analysis_upper);
+    CUfunction analysis_kernel = (lower ? m_cuda->analysis_lower : m_cuda->analysis_upper);
     cuda_check(cuLaunchKernel(analysis_kernel,
                             n_rows, 1, 1,
                             1, 1, 1,
@@ -402,9 +406,9 @@ void CholeskySolver<Float>::launch_kernel(bool lower, CUdeviceptr x) {
 
     CUfunction solve_kernel;
     if(std::is_same_v<Float, float>)
-        solve_kernel = (lower ? solve_lower_float : solve_upper_float);
+        solve_kernel = (lower ? m_cuda->solve_lower_float : m_cuda->solve_upper_float);
     else
-        solve_kernel = (lower ? solve_lower_double : solve_upper_double);
+        solve_kernel = (lower ? m_cuda->solve_lower_double : m_cuda->solve_upper_double);
 
     cuda_check(cuLaunchKernel(solve_kernel,
                             m_n, 1, 1,
@@ -468,7 +472,7 @@ CholeskySolver<Float>::~CholeskySolver() {
         cholmod_free_factor(&m_factor, &m_common);
         cholmod_finish(&m_common);
     } else {
-        scoped_set_context guard(cu_context);
+        scoped_set_context guard(m_cuda->context);
 
         cuda_check(cuMemFree(m_processed_rows_d));
         cuda_check(cuMemFree(m_stack_id_d));

@@ -32,8 +32,10 @@ public:
      * @param x Array of nonzero entries
      * @param type The type of the matrix representation. Can be COO, CSC or CSR
      * @param cpu Whether or not to run the CPU version of the solver.
+     * @param device CUDA device ordinal the solver lives on (ignored if cpu).
+     *        The caller must have made that device's context current.
      */
-    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu);
+    CholeskySolver(int n_rows, int nnz, int *ii, int *jj, double *x, MatrixType type, bool cpu, int device = -1);
 
     ~CholeskySolver();
 
@@ -45,6 +47,12 @@ public:
 
     // Return whether the solver solves on the CPU or on the GPU
     bool is_cpu() { return m_cpu; };
+
+    // CUDA device ordinal of a GPU solver (-1 for CPU)
+    int device() const { return m_device; }
+
+    // Driver state (context + kernels) of the solver's device
+    CudaDeviceState &cuda_state() { return *m_cuda; }
 
 private:
 
@@ -63,6 +71,9 @@ private:
 
     // CPU or GPU solver?
     bool m_cpu;
+
+    int m_device = -1;
+    CudaDeviceState *m_cuda = nullptr;
 
     // Pointers used for the analysis, freed if solving on the GPU, kept if solving on the CPU
     cholmod_factor *m_factor;

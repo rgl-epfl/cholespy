@@ -3,6 +3,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 #if defined(_WIN32)
 #  include <windows.h>
@@ -15,6 +19,7 @@
 static void *handle = nullptr;
 
 CUresult (*cuDeviceGet)(CUdevice *, int) = nullptr;
+CUresult (*cuDeviceGetCount)(int *) = nullptr;
 CUresult (*cuDevicePrimaryCtxRelease)(CUdevice) = nullptr;
 CUresult (*cuDevicePrimaryCtxRetain)(CUcontext *, CUdevice) = nullptr;
 CUresult (*cuGetErrorName)(CUresult, const char **) = nullptr;
@@ -35,15 +40,7 @@ CUresult (*cuModuleUnload)(CUmodule) = nullptr;
 CUresult (*cuCtxPushCurrent)(CUcontext) = nullptr;
 CUresult (*cuCtxPopCurrent)(CUcontext*) = nullptr;
 
-CUdevice cu_device;
-CUcontext cu_context;
-CUmodule cu_module;
-CUfunction solve_upper_float;
-CUfunction solve_upper_double;
-CUfunction solve_lower_float;
-CUfunction solve_lower_double;
-CUfunction analysis_lower;
-CUfunction analysis_upper;
+static std::vector<std::unique_ptr<CudaDeviceState>> device_states;
 
 void cuda_check_impl(CUresult errval, const char *file, const int line) {
     if (errval != CUDA_SUCCESS && errval != CUDA_ERROR_DEINITIALIZED) {
@@ -85,6 +82,7 @@ bool init_cuda() {
         LOAD(cuDevicePrimaryCtxRelease, "v2");
         LOAD(cuDevicePrimaryCtxRetain);
         LOAD(cuDeviceGet);
+        LOAD(cuDeviceGetCount);
         LOAD(cuCtxPushCurrent, "v2");
         LOAD(cuCtxPopCurrent, "v2");
         LOAD(cuGetErrorName);
@@ -121,25 +119,48 @@ bool init_cuda() {
     }
 
     cuda_check(cuInit(0));
-    cuda_check(cuDeviceGet(&cu_device, 0));
-    cuda_check(cuDevicePrimaryCtxRetain(&cu_context, cu_device));
-    cuda_check(cuCtxPushCurrent(cu_context));
-    cuda_check(cuModuleLoadData(&cu_module, (void *) imageBytes));
-    cuda_check(cuModuleGetFunction(&solve_lower_float, cu_module, (char *)"solve_lower_float"));
-    cuda_check(cuModuleGetFunction(&solve_lower_double, cu_module, (char *)"solve_lower_double"));
-    cuda_check(cuModuleGetFunction(&solve_upper_float, cu_module, (char *)"solve_upper_float"));
-    cuda_check(cuModuleGetFunction(&solve_upper_double, cu_module, (char *)"solve_upper_double"));
-    cuda_check(cuModuleGetFunction(&analysis_lower, cu_module, (char *)"analysis_lower"));
-    cuda_check(cuModuleGetFunction(&analysis_upper, cu_module, (char *)"analysis_upper"));
-
     return true;
+}
+
+CudaDeviceState &cuda_device_state(int ordinal) {
+    if (!init_cuda())
+        throw std::runtime_error("cholespy: the CUDA driver could not be loaded.");
+    int count = 0;
+    cuda_check(cuDeviceGetCount(&count));
+    if (ordinal < 0 || ordinal >= count)
+        throw std::invalid_argument("cholespy: invalid CUDA device ordinal " + std::to_string(ordinal) +
+                                    " (" + std::to_string(count) + " visible devices).");
+    if ((int) device_states.size() < count)
+        device_states.resize(count);
+    if (device_states[ordinal])
+        return *device_states[ordinal];
+
+    auto st = std::make_unique<CudaDeviceState>();
+    st->ordinal = ordinal;
+    cuda_check(cuDeviceGet(&st->device, ordinal));
+    cuda_check(cuDevicePrimaryCtxRetain(&st->context, st->device));
+    {
+        scoped_set_context guard(st->context);
+        cuda_check(cuModuleLoadData(&st->module, (void *) imageBytes));
+        cuda_check(cuModuleGetFunction(&st->solve_lower_float, st->module, (char *)"solve_lower_float"));
+        cuda_check(cuModuleGetFunction(&st->solve_lower_double, st->module, (char *)"solve_lower_double"));
+        cuda_check(cuModuleGetFunction(&st->solve_upper_float, st->module, (char *)"solve_upper_float"));
+        cuda_check(cuModuleGetFunction(&st->solve_upper_double, st->module, (char *)"solve_upper_double"));
+        cuda_check(cuModuleGetFunction(&st->analysis_lower, st->module, (char *)"analysis_lower"));
+        cuda_check(cuModuleGetFunction(&st->analysis_upper, st->module, (char *)"analysis_upper"));
+    }
+    device_states[ordinal] = std::move(st);
+    return *device_states[ordinal];
 }
 
 void shutdown_cuda() {
     if (!handle)
         return;
 
-    cuda_check(cuDevicePrimaryCtxRelease(cu_device));
+    for (auto &st : device_states)
+        if (st && st->context)
+            cuda_check(cuDevicePrimaryCtxRelease(st->device));
+    device_states.clear();
 
 #if defined(_WIN32)
     FreeLibrary((HMODULE) handle);
